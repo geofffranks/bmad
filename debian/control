@@ -1,0 +1,15 @@
+Source: bmad
+Maintainer: Geoff Franks <geoff.franks@gmail.com>
+Section: misc
+Priority: optional
+Homepage: http://github.com/geofffranks/bmad
+Standards-Version: 3.9.5
+Build-Depends: debhelper (>= 8),
+               dh-golang,
+               golang-go
+
+Package: bmad
+Description: bolo monitoring analytics daemon
+Architecture: all
+Built-Using: ${misc:Built-Using}
+Depends:    ${misc:Depends}

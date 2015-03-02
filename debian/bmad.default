@@ -1,0 +1,5 @@
+# Whether or not we should run bmad
+#BMAD_ENABLE=yes
+
+# Options to pass the bmad process
+#BMAD_OPTIONS=""

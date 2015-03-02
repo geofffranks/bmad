@@ -1,0 +1,134 @@
+#!/bin/bash
+
+### BEGIN INIT INFO
+# Provides:          bmad
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: bolo monitoring and analytics daemon
+# Description:       bmad is responsible for executing local checks for
+#                    monitoring statuses and performance analytics, sending
+#                    the results upstream to a bolo server
+### END INIT INFO
+
+set -e
+
+BMAD=/usr/bin/bmad
+BMAD_ENABLE="no"
+BMAD_OPTIONS=""
+BMAD_PIDFILE="/run/bmad.pid";
+
+test -x $BMAD || exit 0
+
+DEFAULTS=/etc/default/bmad
+if test -f $DEFAULTS; then
+	. $DEFAULTS
+fi
+
+BMAD_NONE=yes
+if [[ $BMAD_ENABLE == "yes" ]]; then BMAD_NONE=no; fi
+
+BMAD_BIN=$(basename $BMAD)
+BMAD_OPTIONS="$BMAD_OPTIONS"
+
+. /lib/lsb/init-functions
+
+restart() {
+	if [[ $BMAD_ENABLE == "yes" ]]; then
+		log_action_begin_msg "Restarting bmad"
+		start-stop-daemon --stop --retry 30 --pidfile $BMAD_PIDFILE
+		start-stop-daemon --start --pidfile $BMAD_PIDFILE \
+			--startas $BMAD --background --make-pidfile -- $BMAD_OPTIONS || true
+	fi
+}
+
+pidof_bmad() {
+	# print out the PID of bmad if its working
+	if [ -e "$BMAD_PIDFILE" ]; then
+		PIDS=$(pidof $BMAD_BIN | tr ' ' '\n')
+		if echo $PIDS | grep -w $(cat $BMAD_PIDFILE); then
+			return 0
+		fi
+	fi
+	return 1
+}
+
+# Sanitize the environment
+export PATH="/usr/sbin:/sbin:/usr/bin:/bin"
+
+case "$1" in
+start)
+	log_action_begin_msg "Starting bmad"
+	if [[ $BMAD_NONE == "yes" ]]; then
+		log_warning_msg "BMAD=yes not defined in $DEFAULTS";
+		exit 0;
+	fi
+	if [[ $BMAD_ENABLE == "yes" ]]; then
+		log_daemon_msg "  Starting bmad"
+		start-stop-daemon --start --pidfile $BMAD_PIDFILE \
+			--startas $BMAD --background --make-pidfile -- $BMAD_OPTIONS || true
+	fi
+	;;
+
+stop)
+	log_action_begin_msg "Stopping bmad"
+	if [[ $BMAD_NONE == "yes" ]]; then
+		log_warning_msg "BMAD=yes not defined in $DEFAULTS";
+		exit 0;
+	fi
+	if [[ $BMAD_ENABLE == "yes" ]]; then
+		log_daemon_msg "  Stopping bmad"
+		if [[ -n $(pidof_bmad) ]]; then
+			start-stop-daemon --stop --pidfile $BMAD_PIDFILE --retry 2
+		fi
+	fi
+	;;
+
+force-reload|restart)
+	restart
+	;;
+
+reload)
+	log_action_begin_msg "Reloading bmad configuration"
+	status_of_proc -p $BMAD_PIDFILE $BMAD "bmad"
+	kill -SIGHUP $(cat $BMAD_PIDFILE)
+	exit 0
+	;;
+
+try-restart|condrestart)
+	do_restart=0
+	if [[ $BMAD_ENABLE == "yes" ]]; then
+		# allow failure for status_of_proc because condrestart is ok if it isn't found
+		set +e; status_of_proc -p $BMAD_PIDFILE $BMAD "bmad";
+		rc=$?; set -e
+		if [[ $rc == 0 ]]; then do_restart=1; fi
+	fi
+
+	if [[ $do_restart == 1 ]]; then
+		restart
+		exit $?
+	fi
+	exit 0
+	;;
+
+status)
+	GLOBAL_STATUS=0
+	if [[ $BMAD_ENABLE == "yes" ]]; then
+		set +e; status_of_proc -p $BMAD_PIDFILE $BMAD "bmad";
+		rc=$?; set -e
+		if [[ $rc != 0 ]]; then GLOBAL_STATUS=$rc; fi
+	fi
+	if [[ $BMAD_NONE == "yes" ]]; then
+		log_warning_msg "BMAD=yes not defined in $DEFAULTS";
+		GLOBAL_STATUS=1
+	fi
+	exit $GLOBAL_STATUS;
+	;;
+
+*)
+	echo "Usage: /etc/init.d/bmad {start|stop|restart|force-reload|status|try-restart|condrestart}"
+	exit 1
+esac
+
+exit 0
