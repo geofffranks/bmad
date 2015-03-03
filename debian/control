@@ -6,6 +6,9 @@ Homepage: http://github.com/geofffranks/bmad
 Standards-Version: 3.9.5
 Build-Depends: debhelper (>= 8),
                dh-golang,
+               golang-getopt-dev,
+               golang-goyaml-dev,
+               golang-shellwords-dev,
                golang-go
 
 Package: bmad
