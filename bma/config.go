@@ -44,6 +44,13 @@ func default_config() (*Config) {
 
 func hostname() (string) {
 	h, err  := os.Hostname()
+	if err != nil {
+		log.Error("Couldn't get hostname for current host: %s", err.Error())
+		return "unknown"
+	}
+	if strings.ContainsRune(h, '.') {
+		return h
+	}
 	addrs, err := net.LookupHost(h)
 	if err != nil {
 //		log.Warn("Couldn't resolve FQDN of host: %s", err.Error());
