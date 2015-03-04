@@ -4,8 +4,10 @@ import "github.com/geofffranks/bmad/logger"
 import "launchpad.net/goyaml"
 import "io/ioutil"
 import "math/rand"
+import "net"
 import "os"
 import shellwords "github.com/mattn/go-shellwords"
+import "strings"
 import "time"
 
 var log *logger.Logger
@@ -15,35 +17,53 @@ const MIN_INTERVAL int64 = 10
 
 type Config struct {
 	Send_bolo   string
-	Interval    int64
-	Retry       int64
+	Every       int64
+	Retry_every int64
 	Timeout     int64
-	Max_attempts int
+	Retries     int
 	Checks      map[string]*Check
 	Env         map[string]string
 	Log         logger.LogConfig
-
-	host        string
+	Host        string
 }
 //FIXME: test config reloading + merging of schedule data
 
 func default_config() (*Config) {
 	var cfg Config
-	cfg.Interval    = 300
-	cfg.Retry       = 60
+	cfg.Every       = 300
+	cfg.Retry_every = 60
 	cfg.Checks      = map[string]*Check{}
-	cfg.Max_attempts = 1
+	cfg.Retries     = 1
 	cfg.Timeout     = 45
 	cfg.Send_bolo   = "send_bolo -t stream"
 	cfg.Env         = map[string]string{}
-
-	h, err  := os.Hostname()
-	if err != nil {
-		panic(err)
-	}
-	cfg.host = h
+	cfg.Host        = hostname()
 
 	return &cfg
+}
+
+func hostname() (string) {
+	h, err  := os.Hostname()
+	addrs, err := net.LookupHost(h)
+	if err != nil {
+//		log.Warn("Couldn't resolve FQDN of host: %s", err.Error());
+		return h
+	}
+	if len(addrs) > 0 {
+		names, err := net.LookupAddr(addrs[0])
+		if err != nil {
+	//		log.Warn("Couldn't resolve FQDN of host: %s", err.Error());
+			return h
+		}
+		for _, name := range(names) {
+			if strings.ContainsRune(name, '.') {
+				return name
+			}
+		}
+	}
+
+	log.Warn("No FQDN resolvable, defaulting to unqualified hostname")
+	return h
 }
 
 func LoadConfig(cfg_file string) (*Config, error) {
@@ -82,19 +102,19 @@ func LoadConfig(cfg_file string) (*Config, error) {
 					check.Name, check.Command, err)
 			}
 		}
-		if check.Interval <= 0 {
-			check.Interval = new_cfg.Interval
-		} else if check.Interval <= MIN_INTERVAL {
-			check.Interval = MIN_INTERVAL
+		if check.Every <= 0 {
+			check.Every = new_cfg.Every
+		} else if check.Every <= MIN_INTERVAL {
+			check.Every = MIN_INTERVAL
 		}
-		if check.Retry <= 0 {
-			check.Retry = new_cfg.Retry
+		if check.Retry_every <= 0 {
+			check.Retry_every = new_cfg.Retry_every
 		}
-		if check.Retry > check.Interval {
-			check.Retry = check.Interval
+		if check.Retry_every > check.Every {
+			check.Retry_every = check.Every
 		}
-		if check.Max_attempts <= 0 {
-			check.Max_attempts = new_cfg.Max_attempts
+		if check.Retries <= 0 {
+			check.Retries = new_cfg.Retries
 		}
 		if check.Timeout <= 0 {
 			check.Timeout = new_cfg.Timeout
@@ -109,7 +129,7 @@ func LoadConfig(cfg_file string) (*Config, error) {
 			}
 		}
 
-		check.next_run = time.Now().Add(time.Duration(rand.Int63n(check.Interval * int64(time.Second))))
+		check.next_run = time.Now().Add(time.Duration(rand.Int63n(check.Every * int64(time.Second))))
 		if (cfg != nil) {
 			if val, ok := cfg.Checks[check.Name]; ok {
 				check.next_run   = val.next_run

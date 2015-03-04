@@ -11,14 +11,14 @@ import "time"
 
 type Check struct {
 	Command      string
-	Interval     int64
-	Retry        int64
+	Every        int64
+	Retry_every  int64
 	Timeout      int64
-	Max_attempts int
+	Retries      int
 	Env          map[string]string
 	Run_as       string
 	Bulk         bool
-	Report_state bool
+	Report       bool
 	Name         string
 
 	cmd_args     []string
@@ -28,14 +28,14 @@ type Check struct {
 	stdout      *bytes.Buffer
 	stderr      *bytes.Buffer
 
-	started_at    time.Time
-	ended_at      time.Time
-	next_run      time.Time
+	started_at   time.Time
+	ended_at     time.Time
+	next_run     time.Time
 	latency      int64
 	duration     time.Duration
 
-	sig_term      bool
-	sig_kill      bool
+	sig_term     bool
+	sig_kill     bool
 }
 
 const OK       int = 0
@@ -53,13 +53,13 @@ func (self *Check) environment() ([]string) {
 
 func (self *Check) schedule(last_started time.Time, interval int64) () {
 	if (interval <= 0) {
-		interval = self.Interval
+		interval = self.Every
 	}
 	self.next_run = last_started.Add(time.Duration(interval) * time.Second)
 }
 
 func (self *Check) Spawn() (error) {
-	self.schedule(time.Now(), self.Interval)
+	self.schedule(time.Now(), self.Every)
 
 	process := exec.Command(self.cmd_args[0], self.cmd_args[1:]...)
 	process.Env = self.environment()
@@ -146,8 +146,8 @@ func (self *Check) Reap() (string, bool) {
 		log.Debug("%s returned with an invalid exit code. Setting rc to UNKOWN")
 		self.rc = UNKNOWN
 	}
-	if (! self.Bulk && self.rc != OK && self.attempts < self.Max_attempts) {
-		self.schedule(self.started_at, self.Retry)
+	if (! self.Bulk && self.rc != OK && self.attempts < self.Retries) {
+		self.schedule(self.started_at, self.Retry_every)
 		self.attempts++
 	} else {
 		if (self.rc == OK) {
@@ -157,7 +157,7 @@ func (self *Check) Reap() (string, bool) {
 
 	// Add meta-stats for bmad
 	var msg string
-	if (self.Bulk && self.Report_state) {
+	if (self.Bulk && self.Report) {
 		// check-specific state (for bulk data-submitter checks)
 		if self.rc == OK {
 			msg = self.Name + " completed successfully!"
@@ -165,20 +165,20 @@ func (self *Check) Reap() (string, bool) {
 			msg = strings.Replace(err_msg, "\n", " ", -1)
 		}
 		output = output + fmt.Sprintf("STATE %d %s:bmad:%s %d %s\n",
-			time.Now().Unix(), cfg.host, self.Name, self.rc, msg)
+			time.Now().Unix(), cfg.Host, self.Name, self.rc, msg)
 	}
 	// check-specific runtime
 	output = output + fmt.Sprintf("SAMPLE %d %s:bmad:%s:exec-time %d\n",
-		time.Now().Unix(), cfg.host, self.Name, self.duration)
+		time.Now().Unix(), cfg.Host, self.Name, self.duration)
 	// bmad overall check throughput measurement
 	output = output + fmt.Sprintf("COUNTER %d %s:bmad:checks\n",
-		time.Now().Unix(), cfg.host)
+		time.Now().Unix(), cfg.Host)
 	// bmad avg check runtime
 	output = output + fmt.Sprintf("SAMPLE %d %s:bmad:exec-time %d\n",
-		time.Now().Unix(), cfg.host, self.duration)
+		time.Now().Unix(), cfg.Host, self.duration)
 	// bmad avg check latency
 	output = output + fmt.Sprintf("SAMPLE %d %s:bmad:latency %d\n",
-		time.Now().Unix(), cfg.host, self.latency)
+		time.Now().Unix(), cfg.Host, self.latency)
 
 	return output, true
 }
