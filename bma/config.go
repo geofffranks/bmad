@@ -16,14 +16,23 @@ var cfg *Config
 const MIN_INTERVAL int64 = 10
 
 type Config struct {
+	// Command to use for spawning the send_bolo process, to submit Check results
 	Send_bolo   string
+	// Global default interval to run Checks (in seconds)
 	Every       int64
+	// Global default interval to retry failed Checks (in seconds)
 	Retry_every int64
-	Timeout     int64
+	// Global default number of times to retry a failed Check
 	Retries     int
+	// Global default timeout for maximum check execution time (in seconds)
+	Timeout     int64
+	// Map describing all Checks to be executed via bmad, keyed by Check name
 	Checks      map[string]*Check
+	// Global default environment variables to apply to all Checks run
 	Env         map[string]string
+	// Configuration for the bmad logger
 	Log         logger.LogConfig
+	// Hostname that bmad is running on
 	Host        string
 }
 //FIXME: test config reloading + merging of schedule data
@@ -42,6 +51,10 @@ func default_config() (*Config) {
 	return &cfg
 }
 
+// Performes heuristics to determine the hostname of the current host.
+// Tries os.Hostname(), and if that isn't fully qualified (contains a '.'),
+// Fails over to finding the first hostname for the first IP of the host
+// that contains a '.'. If none do, fails back to the unqualified hostname.
 func hostname() (string) {
 	h, err  := os.Hostname()
 	if err != nil {
@@ -73,6 +86,9 @@ func hostname() (string) {
 	return h
 }
 
+// Loads a YAML config file specified by cfg_file, and returns
+// a Config object representing that config. Config reloads are
+// auto-detected and handled seemlessly.
 func LoadConfig(cfg_file string) (*Config, error) {
 	new_cfg := default_config()
 
@@ -161,6 +177,8 @@ func LoadConfig(cfg_file string) (*Config, error) {
 	return cfg, nil
 }
 
+// Returns a reference to the Logger instantiated by the
+// config load.
 func Logger() (*logger.Logger) {
 	return log
 }

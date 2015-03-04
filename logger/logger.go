@@ -5,7 +5,9 @@ import "log/syslog"
 import "strings"
 
 type LogConfig struct {
+	// Syslog level to log at (debug, info, notice, error, etc)
 	Level    string
+	// Syslog facility to log to (daemon, misc, etc)
 	Facility string
 }
 
@@ -16,6 +18,7 @@ type Logger struct {
 
 //FIXME: support console and file based logging, a la libvigor
 
+// Instantiates a logger object
 func Create (cfg LogConfig) (*Logger) {
 	facility := get_facility(cfg.Facility)
 	logger, err := syslog.New(facility, "")
@@ -29,54 +32,71 @@ func Create (cfg LogConfig) (*Logger) {
 	return &l
 }
 
+// Logs a Debug message
+// Supports fmt.Sprintf style arguments, for easier log message generation
 func (self *Logger) Debug (msg string, args ...interface{}) {
 	if self.level >= syslog.LOG_DEBUG {
 		self.log.Debug(fmt.Sprintf(msg, args...))
 	}
 }
 
+// Logs an Info message
+// Supports fmt.Sprintf style arguments, for easier log message generation
 func (self *Logger) Info (msg string, args ...interface{}) {
 	if self.level >= syslog.LOG_INFO {
 		self.log.Info(fmt.Sprintf(msg, args...))
 	}
 }
 
+// Logs a Notice message
+// Supports fmt.Sprintf style arguments, for easier log message generation
 func (self *Logger) Notice (msg string, args ...interface{}) {
 	if self.level >= syslog.LOG_NOTICE {
 		self.log.Notice(fmt.Sprintf(msg, args...))
 	}
 }
 
+// Logs a Warning message
+// Supports fmt.Sprintf style arguments, for easier log message generation
 func (self *Logger) Warn (msg string, args ...interface{}) {
 	if self.level >= syslog.LOG_WARNING {
 		self.log.Warning(fmt.Sprintf(msg, args...))
 	}
 }
 
+// Logs an Error message
+// Supports fmt.Sprintf style arguments, for easier log message generation
 func (self *Logger) Error (msg string, args ...interface{}) {
 	if self.level >= syslog.LOG_ERR {
 		self.log.Err(fmt.Sprintf(msg, args...))
 	}
 }
 
+// Logs a Crit message
+// Supports fmt.Sprintf style arguments, for easier log message generation
 func (self *Logger) Crit (msg string, args ...interface{}) {
 	if self.level >= syslog.LOG_CRIT {
 		self.log.Crit(fmt.Sprintf(msg, args...))
 	}
 }
 
+// Logs an Alert message
+// Supports fmt.Sprintf style arguments, for easier log message generation
 func (self *Logger) Alert (msg string, args ...interface{}) {
 	if self.level >= syslog.LOG_ALERT {
 		self.log.Alert(fmt.Sprintf(msg, args...))
 	}
 }
 
+// Logs an Emerg message
+// Supports fmt.Sprintf style arguments, for easier log message generation
 func (self *Logger) Emerg (msg string, args ...interface{}) {
 	if self.level >= syslog.LOG_EMERG {
 		self.log.Emerg(fmt.Sprintf(msg, args...))
 	}
 }
 
+// Validates the log level based on config strings
 func get_level (level string) (syslog.Priority) {
 	var priority syslog.Priority
 	switch strings.ToLower(level) {
@@ -107,6 +127,7 @@ func get_level (level string) (syslog.Priority) {
 	return priority
 }
 
+// Validates the syslog priority, based on config strings
 func get_facility (facility string) (syslog.Priority) {
 	var priority syslog.Priority
 	switch strings.ToLower(facility) {

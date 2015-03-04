@@ -10,15 +10,30 @@ import "syscall"
 import "time"
 
 type Check struct {
+	// Command to execute for this Check
 	Command      string
+	// Specific interval at which to run this Check (in seconds)
 	Every        int64
-	Retry_every  int64
-	Timeout      int64
+	// Number of times to retry this Check after failure
 	Retries      int
+	// Retry interval at which to retry after Check failure (in secons)
+	Retry_every  int64
+	// Maximum execution time for the Check (in seconds)
+	Timeout      int64
+	// Map of environment variables to set during Check execution
 	Env          map[string]string
+	// User name to run this Check as
 	Run_as       string
+	// Determines whether this Check is running in bulk-mode
+	// (multiple datapoints are being submitted). Non-bulk mode
+	// is usually used for individual STATE checks.
 	Bulk         bool
+	// Determines whether or not this Check will have its execution
+	// return code be auto-submitted as a STATE message for the
+	// execution of the Check. This is most useful (and only allowed)
+	// for bulk-mode Checks
 	Report       bool
+	// Name of the Check
 	Name         string
 
 	cmd_args     []string
@@ -43,6 +58,9 @@ const WARNING  int = 1
 const CRITICAL int = 2
 const UNKNOWN  int = 3
 
+// Converts the Check's environment variable map
+// into an array of bash-compatibally formated environment
+// variables.
 func (self *Check) environment() ([]string) {
 	var env []string
 	for k, v := range(self.Env) {
@@ -51,6 +69,8 @@ func (self *Check) environment() ([]string) {
 	return env
 }
 
+// Schedules the next run of the Check. If interval is
+// not provided, defaults to the Every value of the Check.
 func (self *Check) schedule(last_started time.Time, interval int64) () {
 	if (interval <= 0) {
 		interval = self.Every
@@ -58,6 +78,10 @@ func (self *Check) schedule(last_started time.Time, interval int64) () {
 	self.next_run = last_started.Add(time.Duration(interval) * time.Second)
 }
 
+// Does the needful to kick off a check. This will set the
+// environment variables, pwd, effective user/group, hook
+// up buffers for grabbing check output, run the process,
+// and fill out accounting data for the check.
 func (self *Check) Spawn() (error) {
 	self.schedule(time.Now(), self.Every)
 
@@ -103,6 +127,22 @@ func (self *Check) Spawn() (error) {
 	return nil
 }
 
+// Called on running checks, to determine if they have finished
+// running.
+//
+// If the Check has not finished executing, returns an empty
+// string, and false. If not, returns an empty string, and false.
+// If the Check has been running for longer than its Timeout,
+// a SIGTERM (and failing that a SIGKILL) is issued to forcibly
+// terminate the rogue Check process. In either case, this returns
+// as if the check has not yet finished, and Reap() will need to be
+// called again to fully reap the Check
+//
+// If the Check has finished execution (on its own, or via forced
+// termination), it will return the check output, and true.
+//
+// Once complete, some additional meta-stats for the check execution
+// are appended to the check output, to be submit up to bolo
 func (self *Check) Reap() (string, bool) {
 	pid := self.process.Process.Pid
 
@@ -183,6 +223,7 @@ func (self *Check) Reap() (string, bool) {
 	return output, true
 }
 
+// Determines whether or not a Check should be run
 func (self *Check) ShouldRun() (bool) {
 	return time.Now().After(self.next_run)
 }
