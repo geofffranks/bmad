@@ -1,5 +1,6 @@
 package bma
 
+import "github.com/geofffranks/bmad/log"
 import "os"
 import "os/exec"
 import shellwords "github.com/mattn/go-shellwords"

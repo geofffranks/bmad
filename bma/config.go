@@ -1,6 +1,6 @@
 package bma
 
-import "github.com/geofffranks/bmad/logger"
+import "github.com/geofffranks/bmad/log"
 import "launchpad.net/goyaml"
 import "io/ioutil"
 import "math/rand"
@@ -11,7 +11,6 @@ import shellwords "github.com/mattn/go-shellwords"
 import "strings"
 import "time"
 
-var log *logger.Logger
 var cfg *Config
 
 const MIN_INTERVAL int64 = 10
@@ -26,7 +25,7 @@ type Config struct {
 	Timeout     int64                 // Global default timeout for maximum check execution time (in seconds)
 	Checks      map[string]*Check     // Map describing all Checks to be executed via bmad, keyed by Check name
 	Env         map[string]string     // Global default environment variables to apply to all Checks run
-	Log         logger.LogConfig      // Configuration for the bmad logger
+	Log         log.LogConfig      // Configuration for the bmad logger
 	Host        string                // Hostname that bmad is running on
 	Include_dir string                // Directory to include *.conf files from
 }
@@ -98,14 +97,7 @@ func LoadConfig(cfg_file string) (*Config, error) {
 		return cfg, err
 	}
 
-	new_log := logger.Create(new_cfg.Log)
-	if (err != nil) {
-		if (log != nil) {
-			log.Error("Couldn't load logging configuration: %s", err)
-		}
-		return cfg, err
-	}
-	log = new_log
+	log.SetupLogging(new_cfg.Log)
 
 	if new_cfg.Include_dir != "" {
 		files, err := filepath.Glob(new_cfg.Include_dir + "/*.conf")
@@ -199,12 +191,5 @@ func LoadConfig(cfg_file string) (*Config, error) {
 
 	cfg = new_cfg
 	log.Debug("Config successfully loaded as: %#v", cfg)
-	log.Debug("Logger: %#v", log)
 	return cfg, nil
-}
-
-// Returns a reference to the Logger instantiated by the
-// config load.
-func Logger() (*logger.Logger) {
-	return log
 }

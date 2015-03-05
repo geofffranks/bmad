@@ -1,7 +1,7 @@
 package main
 
 import "github.com/geofffranks/bmad/bma"
-import "github.com/geofffranks/bmad/logger"
+import "github.com/geofffranks/bmad/log"
 import "code.google.com/p/getopt"
 import "fmt"
 import "os"
@@ -14,7 +14,6 @@ import "time"
 const TICK time.Duration = 100 * time.Millisecond
 
 var cfg *bma.Config
-var log *logger.Logger
 
 func main() {
 	getopt.StringLong("config", 'c', "/etc/bmad.conf", "specifies alternative config file.", "/etc/bmad.conf")
@@ -36,8 +35,6 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintf("Couldn't parse config file %s: %s", getopt.GetValue("config"), err))
 	}
-
-	log = bma.Logger()
 
 	log.Notice("bmad starting up")
 	bma.ConnectToBolo()

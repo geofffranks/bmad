@@ -1,5 +1,6 @@
 package bma
 
+import "github.com/geofffranks/bmad/log"
 import "bytes"
 import "fmt"
 import "os/exec"

@@ -1,96 +1,126 @@
-package logger
+package log
 
 import "fmt"
+import "io"
+import "os"
 import "log/syslog"
 import "strings"
+import "time"
 
 type LogConfig struct {
+	Type     string    // logging mode to use - file, syslog, console
 	Level    string    // Syslog level to log at (debug, info, notice, error, etc)
 	Facility string    // Syslog facility to log to (daemon, misc, etc)
+	File     string    // Filename to log to under file mode
 }
 
-type Logger struct {
+type logger struct {
+	out io.Writer
 	level syslog.Priority
-	log   *syslog.Writer
+	ltype string
 }
 
-//FIXME: support console and file based logging, a la libvigor
+var log *logger
 
 // Instantiates a logger object
-func Create (cfg LogConfig) (*Logger) {
-	facility := get_facility(cfg.Facility)
-	logger, err := syslog.New(facility, "")
-	if err != nil {
-		panic(err)
-	}
+func SetupLogging (cfg LogConfig) () {
+	var l logger
 
-	var l Logger
-	l.log   = logger
+	if cfg.Type == "syslog" {
+		facility := get_facility(cfg.Facility)
+		logger, err := syslog.New(facility, "")
+		if err != nil {
+			l.out = os.Stdout
+			os.Stderr.Write([]byte(fmt.Sprintf("Unable to hook up to syslog, using console for logging: %s", err.Error())))
+		}
+		l.out = logger
+	} else if cfg.Type == "file" {
+		f, err := os.OpenFile(cfg.File, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0644)
+		if err != nil {
+			l.out = os.Stdout
+			os.Stderr.Write([]byte(fmt.Sprintf("Unable to log to %s - using console instead: %s", cfg.File, err.Error())))
+		}
+		l.out = f
+	} else {
+		l.out = os.Stdout
+	}
 	l.level = get_level(cfg.Level)
-	return &l
+	l.ltype = cfg.Type
+	log = &l
+}
+
+func write (msg string, args ...interface{}) {
+	if log.ltype != "syslog" {
+		msg = fmt.Sprintf("%s bmad: %s\n", time.Now().String(), fmt.Sprintf(msg, args...))
+	}
+	if log != nil && log.out != nil {
+		log.out.Write([]byte(msg))
+	} else {
+		os.Stderr.Write([]byte(msg))
+	}
 }
 
 // Logs a Debug message
 // Supports fmt.Sprintf style arguments, for easier log message generation
-func (self *Logger) Debug (msg string, args ...interface{}) {
-	if self.level >= syslog.LOG_DEBUG {
-		self.log.Debug(fmt.Sprintf(msg, args...))
+func Debug (msg string, args ...interface{}) {
+	if log.level >= syslog.LOG_DEBUG {
+		write(msg, args...)
 	}
 }
 
 // Logs an Info message
 // Supports fmt.Sprintf style arguments, for easier log message generation
-func (self *Logger) Info (msg string, args ...interface{}) {
-	if self.level >= syslog.LOG_INFO {
-		self.log.Info(fmt.Sprintf(msg, args...))
+func Info (msg string, args ...interface{}) {
+	if log.level >= syslog.LOG_INFO {
+		write(msg, args...)
 	}
 }
 
 // Logs a Notice message
 // Supports fmt.Sprintf style arguments, for easier log message generation
-func (self *Logger) Notice (msg string, args ...interface{}) {
-	if self.level >= syslog.LOG_NOTICE {
-		self.log.Notice(fmt.Sprintf(msg, args...))
+func Notice (msg string, args ...interface{}) {
+	if log.level >= syslog.LOG_NOTICE {
+		write(msg, args...)
 	}
 }
 
 // Logs a Warning message
 // Supports fmt.Sprintf style arguments, for easier log message generation
-func (self *Logger) Warn (msg string, args ...interface{}) {
-	if self.level >= syslog.LOG_WARNING {
-		self.log.Warning(fmt.Sprintf(msg, args...))
+func Warn (msg string, args ...interface{}) {
+	if log.level >= syslog.LOG_WARNING {
+		write(msg, args...)
 	}
 }
 
 // Logs an Error message
 // Supports fmt.Sprintf style arguments, for easier log message generation
-func (self *Logger) Error (msg string, args ...interface{}) {
-	if self.level >= syslog.LOG_ERR {
-		self.log.Err(fmt.Sprintf(msg, args...))
+func Error (msg string, args ...interface{}) {
+	if log.level >= syslog.LOG_ERR {
+		write(msg, args...)
 	}
 }
 
 // Logs a Crit message
 // Supports fmt.Sprintf style arguments, for easier log message generation
-func (self *Logger) Crit (msg string, args ...interface{}) {
-	if self.level >= syslog.LOG_CRIT {
-		self.log.Crit(fmt.Sprintf(msg, args...))
+func Crit (msg string, args ...interface{}) {
+	if log.level >= syslog.LOG_CRIT {
+		write(msg, args...)
 	}
 }
 
 // Logs an Alert message
 // Supports fmt.Sprintf style arguments, for easier log message generation
-func (self *Logger) Alert (msg string, args ...interface{}) {
-	if self.level >= syslog.LOG_ALERT {
-		self.log.Alert(fmt.Sprintf(msg, args...))
+func Alert (msg string, args ...interface{}) {
+	if log.level >= syslog.LOG_ALERT {
+		write(msg, args...)
 	}
 }
 
 // Logs an Emerg message
 // Supports fmt.Sprintf style arguments, for easier log message generation
-func (self *Logger) Emerg (msg string, args ...interface{}) {
-	if self.level >= syslog.LOG_EMERG {
-		self.log.Emerg(fmt.Sprintf(msg, args...))
+func Emerg (msg string, args ...interface{}) {
+	if log.level >= syslog.LOG_EMERG {
+		write(msg, args...)
 	}
 }
 
