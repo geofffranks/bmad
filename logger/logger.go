@@ -5,10 +5,8 @@ import "log/syslog"
 import "strings"
 
 type LogConfig struct {
-	// Syslog level to log at (debug, info, notice, error, etc)
-	Level    string
-	// Syslog facility to log to (daemon, misc, etc)
-	Facility string
+	Level    string    // Syslog level to log at (debug, info, notice, error, etc)
+	Facility string    // Syslog facility to log to (daemon, misc, etc)
 }
 
 type Logger struct {

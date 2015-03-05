@@ -6,6 +6,7 @@ import "io/ioutil"
 import "math/rand"
 import "net"
 import "os"
+import "path/filepath"
 import shellwords "github.com/mattn/go-shellwords"
 import "strings"
 import "time"
@@ -15,25 +16,18 @@ var cfg *Config
 
 const MIN_INTERVAL int64 = 10
 
+// Config objects represent the internal bmad configuration,
+// after being loaded from the YAML config file.
 type Config struct {
-	// Command to use for spawning the send_bolo process, to submit Check results
-	Send_bolo   string
-	// Global default interval to run Checks (in seconds)
-	Every       int64
-	// Global default interval to retry failed Checks (in seconds)
-	Retry_every int64
-	// Global default number of times to retry a failed Check
-	Retries     int
-	// Global default timeout for maximum check execution time (in seconds)
-	Timeout     int64
-	// Map describing all Checks to be executed via bmad, keyed by Check name
-	Checks      map[string]*Check
-	// Global default environment variables to apply to all Checks run
-	Env         map[string]string
-	// Configuration for the bmad logger
-	Log         logger.LogConfig
-	// Hostname that bmad is running on
-	Host        string
+	Send_bolo   string                // Command to use for spawning the send_bolo process, to submit Check results
+	Every       int64                 // Global default interval to run Checks (in seconds)
+	Retry_every int64                 // Global default interval to retry failed Checks (in seconds)
+	Retries     int                   // Global default number of times to retry a failed Check
+	Timeout     int64                 // Global default timeout for maximum check execution time (in seconds)
+	Checks      map[string]*Check     // Map describing all Checks to be executed via bmad, keyed by Check name
+	Env         map[string]string     // Global default environment variables to apply to all Checks run
+	Log         logger.LogConfig      // Configuration for the bmad logger
+	Host        string                // Hostname that bmad is running on
 }
 //FIXME: test config reloading + merging of schedule data
 

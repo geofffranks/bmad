@@ -9,32 +9,31 @@ import "strconv"
 import "syscall"
 import "time"
 
+// Checks in bmad come in two flavors - bulk, and regular.
+// Both modes represent commands that should be run at specific
+// intervals, whose output get piped up to a Bolo server.
+//
+// Bulk mode Checks differ from Non-Bulk mode Checks in that
+// they are expected to submit multiple datapoints/or states
+// for a single execution (e.g. the sar collector, reporting
+// all sar metrics with a single execution). Bulk checks are
+// for this reason also allowed to submit meta-checks about
+// their execution state to bolo, based on their return code.
+//
+// The primary use case for non-bulk checks is to report a single
+// metric, or state up to bolo, and thus state meta-checks are
+// disallowed.
 type Check struct {
-	// Command to execute for this Check
-	Command      string
-	// Specific interval at which to run this Check (in seconds)
-	Every        int64
-	// Number of times to retry this Check after failure
-	Retries      int
-	// Retry interval at which to retry after Check failure (in secons)
-	Retry_every  int64
-	// Maximum execution time for the Check (in seconds)
-	Timeout      int64
-	// Map of environment variables to set during Check execution
-	Env          map[string]string
-	// User name to run this Check as
-	Run_as       string
-	// Determines whether this Check is running in bulk-mode
-	// (multiple datapoints are being submitted). Non-bulk mode
-	// is usually used for individual STATE checks.
-	Bulk         bool
-	// Determines whether or not this Check will have its execution
-	// return code be auto-submitted as a STATE message for the
-	// execution of the Check. This is most useful (and only allowed)
-	// for bulk-mode Checks
-	Report       bool
-	// Name of the Check
-	Name         string
+	Command      string               // Command to execute for this Check
+	Every        int64                // Specific interval at which to run this Check (in seconds)
+	Retries      int                  // Number of times to retry this Check after failure
+	Retry_every  int64                // Retry interval at which to retry after Check failure (in secons)
+	Timeout      int64                // Maximum execution time for the Check (in seconds)
+	Env          map[string]string    // Map of environment variables to set during Check execution
+	Run_as       string               // User name to run this Check as
+	Bulk         bool                 // Is this check a bulk-mode check
+	Report       bool                 // Should this check report its exit code as a STATE event? (bulk-mode only)
+	Name         string               // Name of the Check
 
 	cmd_args     []string
 	process     *exec.Cmd
