@@ -28,6 +28,7 @@ type Config struct {
 	Env         map[string]string     // Global default environment variables to apply to all Checks run
 	Log         logger.LogConfig      // Configuration for the bmad logger
 	Host        string                // Hostname that bmad is running on
+	Include_dir string                // Directory to include *.conf files from
 }
 //FIXME: test config reloading + merging of schedule data
 
@@ -41,6 +42,7 @@ func default_config() (*Config) {
 	cfg.Send_bolo   = "send_bolo -t stream"
 	cfg.Env         = map[string]string{}
 	cfg.Host        = hostname()
+	cfg.Include_dir = "/etc/bmad.d"
 
 	return &cfg
 }
@@ -104,6 +106,36 @@ func LoadConfig(cfg_file string) (*Config, error) {
 		return cfg, err
 	}
 	log = new_log
+
+	if new_cfg.Include_dir != "" {
+		files, err := filepath.Glob(new_cfg.Include_dir + "/*.conf")
+		if err != nil {
+			log.Warn("Couldn't find include files: %s", err.Error())
+		} else {
+			for _, file := range(files) {
+				source, err := ioutil.ReadFile(file)
+				if err != nil {
+					log.Warn("Couldn't read %q: %s", file, err.Error())
+					continue
+				}
+
+				checks := map[string]*Check{}
+				err = goyaml.Unmarshal(source, &checks)
+				if err != nil {
+					log.Warn("Could not parse yaml from %q: %s", file, err.Error())
+					continue
+				}
+
+				for name, check := range(checks) {
+					if _, exists := new_cfg.Checks[name]; exists {
+						log.Warn("Check %q defined in multiple config files, ignoring definition in %s", name, file)
+						continue
+					}
+					new_cfg.Checks[name] = check
+				}
+			}
+		}
+	}
 
 	for name, check := range new_cfg.Checks {
 		if check.Name == "" {
