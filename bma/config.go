@@ -1,3 +1,6 @@
+// Bolo Monitoring and Analytics - a collection of functions and datastructures
+// to support the Bolo Monitoring and Analytics Daemon (bmad). Contains all the
+// bmad logic for configuration management, check execution, and data submission.
 package bma
 
 import "github.com/geofffranks/bmad/log"

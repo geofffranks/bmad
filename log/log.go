@@ -1,3 +1,14 @@
+// Daemons need to log. This package makes that easy, allowing you to
+// configure logging to syslog, a file, or console (stdout), with syslog
+// style log levels.
+//
+// Since this logging mechanism supports non-syslog output, filtering based
+// on log levels is done in-application, so you'll want to accept debug messages
+// and above in syslog configs.
+//
+// Simply call SetupLogging(), passing it a reference to a LogConfig struct and
+// start logging! If you happen to log something prior to setting up logging,
+// messages will print to stderr.
 package log
 
 import "fmt"
@@ -11,7 +22,7 @@ type LogConfig struct {
 	Type     string    // logging mode to use - file, syslog, console
 	Level    string    // Syslog level to log at (debug, info, notice, error, etc)
 	Facility string    // Syslog facility to log to (daemon, misc, etc)
-	File     string    // Filename to log to under file mode
+	File     string    // Path that will be logged to if in file mode
 }
 
 type logger struct {
