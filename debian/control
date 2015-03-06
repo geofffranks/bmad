@@ -8,11 +8,14 @@ Build-Depends: debhelper (>= 8),
                dh-golang,
                golang-getopt-dev,
                golang-goyaml-dev,
+               golang-mangodoc,
                golang-shellwords-dev,
                golang-go
 
 Package: bmad
 Description: bolo monitoring analytics daemon
-Architecture: all
-Built-Using: ${misc:Built-Using}
+  The bolo monitoring analytics daemon is used for running monitoring and
+  analytics checks, submitting the results up to a bolo server.
+Architecture: amd64
 Depends:    ${misc:Depends}
+Built-Using: ${misc:Built-Using}

@@ -33,7 +33,7 @@ type logger struct {
 
 var log *logger
 
-// Instantiates a logger object
+// Does the needful to set up the logging subsystem based on the passed configuration data.
 func SetupLogging (cfg LogConfig) () {
 	var l logger
 
@@ -71,64 +71,64 @@ func write (msg string, args ...interface{}) {
 	}
 }
 
-// Logs a Debug message
-// Supports fmt.Sprintf style arguments, for easier log message generation
+// Logs a Debug message.
+// Supports fmt.Sprintf style arguments.
 func Debug (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_DEBUG {
 		write(msg, args...)
 	}
 }
 
-// Logs an Info message
-// Supports fmt.Sprintf style arguments, for easier log message generation
+// Logs an Info message.
+// Supports fmt.Sprintf style arguments.
 func Info (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_INFO {
 		write(msg, args...)
 	}
 }
 
-// Logs a Notice message
-// Supports fmt.Sprintf style arguments, for easier log message generation
+// Logs a Notice message.
+// Supports fmt.Sprintf style arguments.
 func Notice (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_NOTICE {
 		write(msg, args...)
 	}
 }
 
-// Logs a Warning message
-// Supports fmt.Sprintf style arguments, for easier log message generation
+// Logs a Warning message.
+// Supports fmt.Sprintf style arguments.
 func Warn (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_WARNING {
 		write(msg, args...)
 	}
 }
 
-// Logs an Error message
-// Supports fmt.Sprintf style arguments, for easier log message generation
+// Logs an Error message.
+// Supports fmt.Sprintf style arguments.
 func Error (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_ERR {
 		write(msg, args...)
 	}
 }
 
-// Logs a Crit message
-// Supports fmt.Sprintf style arguments, for easier log message generation
+// Logs a Crit message.
+// Supports fmt.Sprintf style arguments.
 func Crit (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_CRIT {
 		write(msg, args...)
 	}
 }
 
-// Logs an Alert message
-// Supports fmt.Sprintf style arguments, for easier log message generation
+// Logs an Alert message.
+// Supports fmt.Sprintf style arguments.
 func Alert (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_ALERT {
 		write(msg, args...)
 	}
 }
 
-// Logs an Emerg message
-// Supports fmt.Sprintf style arguments, for easier log message generation
+// Logs an Emerg message.
+// Supports fmt.Sprintf style arguments.
 func Emerg (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_EMERG {
 		write(msg, args...)

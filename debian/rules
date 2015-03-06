@@ -6,3 +6,8 @@ export DH_GOPKG := github.com/geofffranks/bmad
 export GO_ROOT := /usr/share/gocode/
 %:
 	dh $@ --buildsystem=golang --with=golang
+
+override_dh_install:
+	dh_install -O--buildsystem=golang
+	make docs
+	dh_installman
