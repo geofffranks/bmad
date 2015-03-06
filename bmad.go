@@ -1,3 +1,118 @@
+// The Bolo Monitoring and Analytics Daemon
+//
+// bmad is an agent designed to execute monitoring
+// and analytics checks at periodic configured intervals,
+// submitting results up to a Bolo server.
+//
+//OPTIONS
+//
+// --config, -c FILE
+//		Specify an alternate config file. Defaults to /etc/bmad.conf
+// --test, -t
+//		Test mode - runs all checks immediately in the foreground
+// --match, -m REGEX
+//		Filters the checks to run in --test mode
+// --noop, -n
+//		Disable result submission to bolo (only used for --test mode)
+// --help, -h
+//		Displays the help dialog
+//
+// CONFIGURATION
+//
+// bmad configs are YAML config files, describing global configuration, as
+// well as all the checks that should be run. Below is an example configuration
+// with all available directives filled in with their defaults:
+//
+//	send_bolo:   send_bolo -t stream    # Command for spawning the send_bolo result submission process
+//	every:       300                    # Default interval to run checks (in seconds)
+//	retry_every: 60                     # Default interval to retry failed checks (in seconds)
+//	retries:     1                      # Number of times to retry failed checks before submitting results
+//	timeout:     45                     # Maximum execution time (in seconds) of a check
+//	env:         {}                     # Hash of environment variables to set when running checks
+//	host:        <local FQDN>           # hostname that bmad is running on (will auto-detect FQDN if possible)
+//	include_dir: /etc/bmad.d            # Directory to load additional check configurations from
+//	checks:      {}                     # Hash of checks to run
+//	log:
+//		type:      console                # Specifies whether to log to stdout/console, syslog, or file
+//		level:     debug                  # Log level to use (debug, info, notice, warn, err, etc)
+//		facility:  daemon                 # syslog facility (only used in syslog mode)
+//		file:      ""                     # File name to log to (only used in file mode)
+//
+// Any files ending in '.conf' in the include_dir directory will be automatically loaded as additional
+// hashes of check configurations, which are merged in with any found in the main config file. If there
+// are any duplicate check names found, the earliest seen takes precedence.
+//
+// CHECKS
+//
+// Running checks is the primary purpose of bmad. Checks are scheduled, and run. Once complete, their
+// standard output is captured and sent up to bolo. In addition to this, metadata regarding the check
+// execution will automatically be sent up to bolo, to enable easier monitoring of the monitoring system.
+// If the check is a bulk check, and is configured to do so, its return code will be processed, and a
+// STATE result will be sent up to bolo as well.
+//
+// As you may have surmised by now, checks come in two flavors: regular, and bulk. Regular checks are
+// single events, usually reporting the STATE of a specific thing and perhaps some related COUNTERS or SAMPLES.
+// Bulk checks generally run a whole bunch of tests, and submit a large amount of performance data up
+// to bolo. Bulk checks are always run at their regular interval, and circumvent bmad's retry logic,
+// As mentioned above, they also can be configured to have their success/failure submitted up as a STATE
+// message.
+//
+// Checks share many directives as the main config file, to override the global defaults. Any check-specific
+// settings take precedence over the global values (since that's generally what one would expect of an override).
+// For the case of environment variables, the hash of environment variables is merged together, with any
+// conflicts being chosen in favor of the check-specific value. Below are all the available check configuration
+// directives:
+//
+//	my_check:                             # name of the check
+//		command:     /path/to/cmd --args    # command to run
+//		every:       300                    # Interval to run this check (in seconds)
+//		retries:     1                      # Number of times to retry after failure, before submitting results
+//		retry_every: 60                     # Interval to retry the check after failure
+//		timeout:     45                     # Maximum execution time (in seconds) of the check
+//		env:         {}                     # Hash of environment variables to set for the check
+//		run_as:      root                   # User to run the check as (defaults to the user running bmad)
+//		bulk:        false                  # Is this check a bulk check? See CHECKS for details
+//		report:      false                  # Automatically report status of the bulk check execution?
+//		name:        my_check               # Override the name specified by the key of this check
+//
+// For proper retry and status submission, checks must exit with an exit code that indicates its STATE,
+// according to the following values:
+//
+//	0    OK
+//	1    WARNING
+//	2    CRITICAL
+//	3    UNKNOWN
+//
+// REAL WORLD EXAMPLE
+//
+// Here's a real world example of /etc/bmad.conf:
+//
+//	send_bolo:   /usr/bin/send_bolo -t stream -e tcp://bolo.example.com:2999
+//	log:
+//		level:     warning
+//		facility:  daemon
+//		type:      syslog
+//	checks:
+//		hostinfo:
+//			command: /usr/lib/bolo/collectors/hostinfo
+//			every:   3600
+//			bulk:    true
+//
+// And an example /etc/bmad.d/sar.conf
+//
+//	sar:
+//		command:   /usr/lib/bolo/collectors/sar
+//		every:     15
+//		timeout:   10
+//		bulk:      true
+//
+// NOTE: the /etc/bmad.d/sar.conf file has checks defined at the top level of the file, and does not
+// contain a 'checks' key, like /etc/bmad.conf.
+//
+// AUTHOR
+//
+// Written by Geoff Franks <geoff.franks@gmail.com>
+//
 package main
 
 import "github.com/geofffranks/bmad/bma"
