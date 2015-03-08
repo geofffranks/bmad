@@ -2,6 +2,7 @@ package bma
 
 import "github.com/geofffranks/bmad/log"
 import "bytes"
+import "errors"
 import "fmt"
 import "os/exec"
 import "os/user"
@@ -48,6 +49,7 @@ type Check struct {
 	next_run     time.Time
 	latency      int64
 	duration     time.Duration
+	running      bool
 
 	sig_term     bool
 	sig_kill     bool
@@ -83,7 +85,9 @@ func (self *Check) schedule(last_started time.Time, interval int64) () {
 // up buffers for grabbing check output, run the process,
 // and fill out accounting data for the check.
 func (self *Check) Spawn() (error) {
-	self.schedule(time.Now(), self.Every)
+	if self.running {
+		return errors.New(fmt.Sprintf("%s is already running [%d]", self.Name, self.process.Process.Pid))
+	}
 
 	process := exec.Command(self.cmd_args[0], self.cmd_args[1:]...)
 	process.Env = self.environment()
@@ -117,12 +121,13 @@ func (self *Check) Spawn() (error) {
 
 	self.started_at  = time.Now()
 	self.ended_at    = time.Time{}
-	self.duration   = 0
-	self.process    = process
+	self.running     = true
+	self.duration    = 0
+	self.process     = process
 	self.sig_term    = false
 	self.sig_kill    = false
-	self.stdout     = &o
-	self.stderr     = &e
+	self.stdout      = &o
+	self.stderr      = &e
 
 	return nil
 }
@@ -174,6 +179,7 @@ func (self *Check) Reap() (string, bool) {
 	}
 
 	self.ended_at = time.Now()
+	self.running  = false
 	self.duration = time.Since(self.started_at)
 	self.latency  = self.started_at.UnixNano() - self.next_run.UnixNano()
 	output       := string(self.stdout.Bytes())
@@ -196,6 +202,10 @@ func (self *Check) Reap() (string, bool) {
 		if (self.rc == OK) {
 			self.attempts = 0
 		}
+		self.schedule(self.started_at, self.Every)
+	}
+	if self.ended_at.After(self.next_run) {
+		log.Warn("Check %s[%d] ran longer than check interval, its essentially looping, maybe you should increase interval, or decrease timeout?", self.Name, pid)
 	}
 
 	// Add meta-stats for bmad
@@ -228,5 +238,5 @@ func (self *Check) Reap() (string, bool) {
 
 // Determines whether or not a Check should be run
 func (self *Check) ShouldRun() (bool) {
-	return time.Now().After(self.next_run)
+	return ! self.running && time.Now().After(self.next_run)
 }
