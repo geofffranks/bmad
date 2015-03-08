@@ -158,7 +158,7 @@ func (self *Check) Reap() (string, bool) {
 		if self.started_at.After(time.Now().Add(time.Duration(self.Timeout + 2) * time.Second)) {
 			log.Warn("%s [%d] has been running too long, sending SIGKILL", self.Name, pid)
 			if err := syscall.Kill(pid, syscall.SIGKILL); err != nil {
-				log.Error("Error sending SIGKILL to process %d: %s", pid, err.Error())
+				log.Error("Error sending SIGKILL to process %s [%d]: %s", self.Name, pid, err.Error())
 			}
 			self.sig_kill = true
 		}
@@ -166,7 +166,7 @@ func (self *Check) Reap() (string, bool) {
 		if self.started_at.After(time.Now().Add(time.Duration(self.Timeout) * time.Second)) {
 			log.Warn("%s [%d] has been running too long, sending SIGTERM", self.Name, pid)
 			if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
-				log.Error("Error sending SIGTERM to process %d: %s", pid, err.Error())
+				log.Error("Error sending SIGTERM to process %s [%d]: %s", self.Name, pid, err.Error())
 			}
 			self.sig_term = true
 		}
@@ -182,11 +182,11 @@ func (self *Check) Reap() (string, bool) {
 	if (ws.Exited()) {
 		self.rc = ws.ExitStatus()
 	} else {
-		log.Debug("%s exited abnormally (signaled/stopped). Setting rc to UNKNOWN")
+		log.Debug("%s [%d] exited abnormally (signaled/stopped). Setting rc to UNKNOWN", self.Name, pid)
 		self.rc = UNKNOWN
 	}
 	if self.rc > UNKNOWN {
-		log.Debug("%s returned with an invalid exit code. Setting rc to UNKOWN")
+		log.Debug("%s [%d] returned with an invalid exit code. Setting rc to UNKOWN", self.Name, pid)
 		self.rc = UNKNOWN
 	}
 	if (! self.Bulk && self.rc != OK && self.attempts < self.Retries) {
