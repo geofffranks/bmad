@@ -106,14 +106,14 @@ func (self *Check) Spawn() (error) {
 		if err != nil {
 			return err
 		}
-		log.Debug("Check requested to run as %q", self.Run_as)
+		log.Debug("Running check %s as %q", self.Name, self.Run_as)
 		process.SysProcAttr = &syscall.SysProcAttr{Credential: &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)}}
 	}
 
 	if err := process.Start(); err != nil {
 		return err
 	}
-	log.Debug("Check %q initiated as process %d", self.Name, process.Process.Pid)
+	log.Debug("Spawned check %s[%d]", self.Name, process.Process.Pid)
 
 	self.started_at  = time.Now()
 	self.ended_at    = time.Time{}
@@ -150,23 +150,23 @@ func (self *Check) Reap() (string, bool) {
 	var ws syscall.WaitStatus
 	status, err := syscall.Wait4(pid, &ws, syscall.WNOHANG, nil);
 	if err != nil {
-		log.Error("Error waiting on process %d: %s", pid, err.Error())
+		log.Error("Error waiting on check %s[%d]: %s", self.Name, pid, err.Error())
 		return "", false
 	}
 	if status == 0 {
 		// self to see if we need to sigkill due to failed sigterm
 		if self.started_at.After(time.Now().Add(time.Duration(self.Timeout + 2) * time.Second)) {
-			log.Warn("%s [%d] has been running too long, sending SIGKILL", self.Name, pid)
+			log.Warn("Check %%s[%d] has been running too long, sending SIGKILL", self.Name, pid)
 			if err := syscall.Kill(pid, syscall.SIGKILL); err != nil {
-				log.Error("Error sending SIGKILL to process %s [%d]: %s", self.Name, pid, err.Error())
+				log.Error("Error sending SIGKILL to process %s[%d]: %s", self.Name, pid, err.Error())
 			}
 			self.sig_kill = true
 		}
 		// self to see if we need to sigterm due to self timeout expiry
 		if self.started_at.After(time.Now().Add(time.Duration(self.Timeout) * time.Second)) {
-			log.Warn("%s [%d] has been running too long, sending SIGTERM", self.Name, pid)
+			log.Warn("Check %s[%d] has been running too long, sending SIGTERM", self.Name, pid)
 			if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
-				log.Error("Error sending SIGTERM to process %s [%d]: %s", self.Name, pid, err.Error())
+				log.Error("Error sending SIGTERM to process %s[%d]: %s", self.Name, pid, err.Error())
 			}
 			self.sig_term = true
 		}
@@ -182,11 +182,11 @@ func (self *Check) Reap() (string, bool) {
 	if (ws.Exited()) {
 		self.rc = ws.ExitStatus()
 	} else {
-		log.Debug("%s [%d] exited abnormally (signaled/stopped). Setting rc to UNKNOWN", self.Name, pid)
+		log.Debug("Check %s[%d] exited abnormally (signaled/stopped). Setting rc to UNKNOWN", self.Name, pid)
 		self.rc = UNKNOWN
 	}
 	if self.rc > UNKNOWN {
-		log.Debug("%s [%d] returned with an invalid exit code. Setting rc to UNKOWN", self.Name, pid)
+		log.Debug("Check %s[%d] returned with an invalid exit code. Setting rc to UNKOWN", self.Name, pid)
 		self.rc = UNKNOWN
 	}
 	if (! self.Bulk && self.rc != OK && self.attempts < self.Retries) {
