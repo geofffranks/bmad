@@ -76,7 +76,7 @@ func write (msg string, args ...interface{}) {
 // Supports fmt.Sprintf style arguments.
 func Debug (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_DEBUG {
-		write(msg, args...)
+		write("DEBUG: " + msg, args...)
 	}
 }
 
@@ -84,7 +84,7 @@ func Debug (msg string, args ...interface{}) {
 // Supports fmt.Sprintf style arguments.
 func Info (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_INFO {
-		write(msg, args...)
+		write("INFO: " + msg, args...)
 	}
 }
 
@@ -92,7 +92,7 @@ func Info (msg string, args ...interface{}) {
 // Supports fmt.Sprintf style arguments.
 func Notice (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_NOTICE {
-		write(msg, args...)
+		write("NOTICE: " + msg, args...)
 	}
 }
 
@@ -100,7 +100,7 @@ func Notice (msg string, args ...interface{}) {
 // Supports fmt.Sprintf style arguments.
 func Warn (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_WARNING {
-		write(msg, args...)
+		write("WARNING: " + msg, args...)
 	}
 }
 
@@ -108,7 +108,7 @@ func Warn (msg string, args ...interface{}) {
 // Supports fmt.Sprintf style arguments.
 func Error (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_ERR {
-		write(msg, args...)
+		write("ERROR: " + msg, args...)
 	}
 }
 
@@ -116,7 +116,7 @@ func Error (msg string, args ...interface{}) {
 // Supports fmt.Sprintf style arguments.
 func Crit (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_CRIT {
-		write(msg, args...)
+		write("CRITICAL: " + msg, args...)
 	}
 }
 
@@ -124,7 +124,7 @@ func Crit (msg string, args ...interface{}) {
 // Supports fmt.Sprintf style arguments.
 func Alert (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_ALERT {
-		write(msg, args...)
+		write("ALERT: " + msg, args...)
 	}
 }
 
@@ -132,7 +132,7 @@ func Alert (msg string, args ...interface{}) {
 // Supports fmt.Sprintf style arguments.
 func Emerg (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_EMERG {
-		write(msg, args...)
+		write("EMERGENCY: " + msg, args...)
 	}
 }
 
