@@ -61,8 +61,9 @@ func SetupLogging (cfg LogConfig) () {
 }
 
 func write (msg string, args ...interface{}) {
+	msg = fmt.Sprintf(msg, args...)
 	if log.ltype != "syslog" {
-		msg = fmt.Sprintf("%s bmad: %s\n", time.Now().String(), fmt.Sprintf(msg, args...))
+		msg = fmt.Sprintf("%s bmad: %s\n", time.Now().String(), msg)
 	}
 	if log != nil && log.out != nil {
 		log.out.Write([]byte(msg))
