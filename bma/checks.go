@@ -151,10 +151,12 @@ func (self *Check) Reap() (string, bool) {
 	status, err := syscall.Wait4(pid, &ws, syscall.WNOHANG, nil);
 	if err != nil {
 		log.Error("Error waiting on process %d: %s", pid, err.Error())
+		return "", false
 	}
 	if status == 0 {
 		// self to see if we need to sigkill due to failed sigterm
 		if self.started_at.After(time.Now().Add(time.Duration(self.Timeout + 2) * time.Second)) {
+			log.Warn("%s [%d] has been running too long, sending SIGKILL", self.Name, pid)
 			if err := syscall.Kill(pid, syscall.SIGKILL); err != nil {
 				log.Error("Error sending SIGKILL to process %d: %s", pid, err.Error())
 			}
@@ -162,6 +164,7 @@ func (self *Check) Reap() (string, bool) {
 		}
 		// self to see if we need to sigterm due to self timeout expiry
 		if self.started_at.After(time.Now().Add(time.Duration(self.Timeout) * time.Second)) {
+			log.Warn("%s [%d] has been running too long, sending SIGTERM", self.Name, pid)
 			if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
 				log.Error("Error sending SIGTERM to process %d: %s", pid, err.Error())
 			}
