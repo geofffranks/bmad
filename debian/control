@@ -14,8 +14,8 @@ Build-Depends: debhelper (>= 8),
 
 Package: bmad
 Description: bolo monitoring analytics daemon
-  The bolo monitoring analytics daemon is used for running monitoring and
-  analytics checks, submitting the results up to a bolo server.
+ The bolo monitoring analytics daemon is used for running monitoring and
+ analytics checks, submitting the results up to a bolo server.
 Architecture: amd64
-Depends:    ${misc:Depends}
+Depends: ${misc:Depends}, ${shlibs:Depends}
 Built-Using: ${misc:Built-Using}
