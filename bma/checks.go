@@ -160,7 +160,7 @@ func (self *Check) Reap() (string, bool) {
 	}
 	if status == 0 {
 		// self to see if we need to sigkill due to failed sigterm
-		if self.started_at.After(time.Now().Add(time.Duration(self.Timeout + 2) * time.Second)) {
+		if self.started_at.Add(time.Duration(self.Timeout + 2) * time.Second).After(time.Now()) {
 			log.Warn("Check %%s[%d] has been running too long, sending SIGKILL", self.Name, pid)
 			if err := syscall.Kill(pid, syscall.SIGKILL); err != nil {
 				log.Error("Error sending SIGKILL to process %s[%d]: %s", self.Name, pid, err.Error())
@@ -168,7 +168,7 @@ func (self *Check) Reap() (string, bool) {
 			self.sig_kill = true
 		}
 		// self to see if we need to sigterm due to self timeout expiry
-		if self.started_at.After(time.Now().Add(time.Duration(self.Timeout) * time.Second)) {
+		if self.started_at.Add(time.Duration(self.Timeout) * time.Second).After(time.Now()) {
 			log.Warn("Check %s[%d] has been running too long, sending SIGTERM", self.Name, pid)
 			if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
 				log.Error("Error sending SIGTERM to process %s[%d]: %s", self.Name, pid, err.Error())
