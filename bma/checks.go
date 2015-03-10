@@ -86,7 +86,7 @@ func (self *Check) schedule(last_started time.Time, interval int64) () {
 // and fill out accounting data for the check.
 func (self *Check) Spawn() (error) {
 	if self.running {
-		return errors.New(fmt.Sprintf("%s is already running [%d]", self.Name, self.process.Process.Pid))
+		return errors.New(fmt.Sprintf("check %s[%d] is already running", self.Name, self.process.Process.Pid))
 	}
 
 	process := exec.Command(self.cmd_args[0], self.cmd_args[1:]...)
@@ -163,7 +163,7 @@ func (self *Check) Reap() (string, bool) {
 		if time.Now().After(self.started_at.Add(time.Duration(self.Timeout + 2) * time.Second)) {
 			log.Warn("Check %s[%d] has been running too long, sending SIGKILL", self.Name, pid)
 			if err := syscall.Kill(pid, syscall.SIGKILL); err != nil {
-				log.Error("Error sending SIGKILL to process %s[%d]: %s", self.Name, pid, err.Error())
+				log.Error("Error sending SIGKILL to check %s[%d]: %s", self.Name, pid, err.Error())
 			}
 			self.sig_kill = true
 		}
@@ -171,7 +171,7 @@ func (self *Check) Reap() (string, bool) {
 		if time.Now().After(self.started_at.Add(time.Duration(self.Timeout) * time.Second)) {
 			log.Warn("Check %s[%d] has been running too long, sending SIGTERM", self.Name, pid)
 			if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
-				log.Error("Error sending SIGTERM to process %s[%d]: %s", self.Name, pid, err.Error())
+				log.Error("Error sending SIGTERM to check %s[%d]: %s", self.Name, pid, err.Error())
 			}
 			self.sig_term = true
 		}
