@@ -205,7 +205,12 @@ func (self *Check) Reap() (string, bool) {
 		self.schedule(self.started_at, self.Every)
 	}
 	if self.ended_at.After(self.next_run) {
-		log.Warn("Check %s[%d] ran longer than check interval, its essentially looping, maybe you should increase interval, or decrease timeout?", self.Name, pid)
+		timeout_triggered := "not reached"
+		if self.sig_term || self.sig_kill {
+			timeout_triggered = "reached"
+		}
+		log.Warn("Check %s[%d] took %0.3f seconds to run, at interval %d (timeout of %d was %s)",
+			self.Name, pid, self.duration.Seconds(), self.Every, self.Timeout, timeout_triggered)
 	}
 
 	// Add meta-stats for bmad
@@ -221,8 +226,8 @@ func (self *Check) Reap() (string, bool) {
 			time.Now().Unix(), cfg.Host, self.Name, self.rc, msg)
 	}
 	// check-specific runtime
-	output = output + fmt.Sprintf("SAMPLE %d %s:bmad:%s:exec-time %d\n",
-		time.Now().Unix(), cfg.Host, self.Name, self.duration)
+	output = output + fmt.Sprintf("SAMPLE %d %s:bmad:%s:exec-time %0.4f\n",
+		time.Now().Unix(), cfg.Host, self.Name, self.duration.Seconds())
 	// bmad overall check throughput measurement
 	output = output + fmt.Sprintf("COUNTER %d %s:bmad:checks\n",
 		time.Now().Unix(), cfg.Host)
