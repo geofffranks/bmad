@@ -47,7 +47,7 @@ type Check struct {
 	started_at   time.Time
 	ended_at     time.Time
 	next_run     time.Time
-	latency      int64
+	latency      time.Duration
 	duration     time.Duration
 	running      bool
 
@@ -181,7 +181,7 @@ func (self *Check) Reap() (string, bool) {
 	self.ended_at = time.Now()
 	self.running  = false
 	self.duration = time.Since(self.started_at)
-	self.latency  = self.started_at.UnixNano() - self.next_run.UnixNano()
+	self.latency  = self.started_at.Sub(self.next_run)
 	output       := string(self.stdout.Bytes())
 	err_msg      := string(self.stderr.Bytes())
 
@@ -232,11 +232,11 @@ func (self *Check) Reap() (string, bool) {
 	output = output + fmt.Sprintf("COUNTER %d %s:bmad:checks\n",
 		time.Now().Unix(), cfg.Host)
 	// bmad avg check runtime
-	output = output + fmt.Sprintf("SAMPLE %d %s:bmad:exec-time %d\n",
-		time.Now().Unix(), cfg.Host, self.duration)
+	output = output + fmt.Sprintf("SAMPLE %d %s:bmad:exec-time %0.4f\n",
+		time.Now().Unix(), cfg.Host, self.duration.Seconds())
 	// bmad avg check latency
-	output = output + fmt.Sprintf("SAMPLE %d %s:bmad:latency %d\n",
-		time.Now().Unix(), cfg.Host, self.latency)
+	output = output + fmt.Sprintf("SAMPLE %d %s:bmad:latency %0.4f\n",
+		time.Now().Unix(), cfg.Host, self.latency.Seconds())
 
 	return output, true
 }
