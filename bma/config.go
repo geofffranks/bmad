@@ -151,6 +151,9 @@ func LoadConfig(cfg_file string) (*Config, error) {
 		} else if check.Every <= MIN_INTERVAL {
 			check.Every = MIN_INTERVAL
 		}
+		if check.Every <= 0 {
+			check.Every = MIN_INTERVAL * 30
+		}
 		if check.Retry_every <= 0 {
 			check.Retry_every = new_cfg.Retry_every
 		}
@@ -162,6 +165,12 @@ func LoadConfig(cfg_file string) (*Config, error) {
 		}
 		if check.Timeout <= 0 {
 			check.Timeout = new_cfg.Timeout
+		}
+		if check.Timeout >= check.Retry_every || check.Timeout <= 0 {
+			check.Timeout = check.Retry_every - 1
+		}
+		if check.Timeout <= 0 {
+			check.Timeout = MIN_INTERVAL - 1
 		}
 		if check.Env == nil {
 			check.Env = new_cfg.Env
@@ -190,6 +199,7 @@ func LoadConfig(cfg_file string) (*Config, error) {
 				check.process    = val.process
 			}
 		}
+		log.Debug("Check %s defined as %#v", check.Name, check)
 	}
 
 	cfg = new_cfg
