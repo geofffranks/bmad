@@ -26,8 +26,10 @@
 //	send_bolo:   send_bolo -t stream    # Command for spawning the send_bolo result submission process
 //	every:       300                    # Default interval to run checks (in seconds)
 //	retry_every: 60                     # Default interval to retry failed checks (in seconds)
-//	retries:     1                      # Number of times to retry failed checks before submitting results
-//	timeout:     45                     # Maximum execution time (in seconds) of a check
+//	retries:     1                      # Default number of times to retry failed checks before submitting results
+//	timeout:     45                     # Default maximum execution time (in seconds) of a check
+//	bulk:        false                  # Default for is this check a bulk check? (must be "true" to enable)
+//	report:      false                  # Default for automatically report status of the bulk check execution? (must be "true" to enable)
 //	env:         {}                     # Hash of environment variables to set when running checks
 //	host:        <local FQDN>           # hostname that bmad is running on (will auto-detect FQDN if possible)
 //	include_dir: /etc/bmad.d            # Directory to load additional check configurations from
@@ -71,8 +73,8 @@
 //		timeout:     45                     # Maximum execution time (in seconds) of the check
 //		env:         {}                     # Hash of environment variables to set for the check
 //		run_as:      root                   # User to run the check as (defaults to the user running bmad)
-//		bulk:        false                  # Is this check a bulk check? See CHECKS for details
-//		report:      false                  # Automatically report status of the bulk check execution?
+//		bulk:        false                  # Is this check a bulk check? See CHECKS for details (must be "true" to enable)
+//		report:      false                  # Automatically report status of the bulk check execution? (must be "true" to enable)
 //		name:        my_check               # Override the name specified by the key of this check
 //
 // For proper retry and status submission, checks must exit with an exit code that indicates its STATE,

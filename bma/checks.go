@@ -33,8 +33,8 @@ type Check struct {
 	Timeout      int64                // Maximum execution time for the Check (in seconds)
 	Env          map[string]string    // Map of environment variables to set during Check execution
 	Run_as       string               // User name to run this Check as
-	Bulk         bool                 // Is this check a bulk-mode check
-	Report       bool                 // Should this check report its exit code as a STATE event? (bulk-mode only)
+	Bulk         string               // Is this check a bulk-mode check
+	Report       string               // Should this check report its exit code as a STATE event? (bulk-mode only)
 	Name         string               // Name of the Check
 
 	cmd_args     []string
@@ -195,7 +195,7 @@ func (self *Check) Reap() (string, bool) {
 		log.Debug("Check %s[%d] returned with an invalid exit code. Setting rc to UNKOWN", self.Name, pid)
 		self.rc = UNKNOWN
 	}
-	if (! self.Bulk && self.rc != OK && self.attempts < self.Retries) {
+	if (self.Bulk != "true" && self.rc != OK && self.attempts < self.Retries) {
 		self.schedule(self.started_at, self.Retry_every)
 		self.attempts++
 	} else {
@@ -215,7 +215,7 @@ func (self *Check) Reap() (string, bool) {
 
 	// Add meta-stats for bmad
 	var msg string
-	if (self.Bulk && self.Report) {
+	if (self.Bulk == "true" && self.Report == "true") {
 		// check-specific state (for bulk data-submitter checks)
 		if self.rc == OK {
 			msg = self.Name + " completed successfully!"
@@ -237,6 +237,8 @@ func (self *Check) Reap() (string, bool) {
 	// bmad avg check latency
 	output = output + fmt.Sprintf("SAMPLE %d %s:bmad:latency %0.4f\n",
 		time.Now().Unix(), cfg.Host, self.latency.Seconds())
+
+	log.Debug("%s output: %s", self.Name, output)
 
 	return output, true
 }

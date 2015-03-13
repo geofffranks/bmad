@@ -26,9 +26,11 @@ type Config struct {
 	Retry_every int64                 // Global default interval to retry failed Checks (in seconds)
 	Retries     int                   // Global default number of times to retry a failed Check
 	Timeout     int64                 // Global default timeout for maximum check execution time (in seconds)
+	Bulk        string                // Global default for is this a bulk-mode check
+	Report      string                // Global default for should a bulk check report its STATE
 	Checks      map[string]*Check     // Map describing all Checks to be executed via bmad, keyed by Check name
 	Env         map[string]string     // Global default environment variables to apply to all Checks run
-	Log         log.LogConfig      // Configuration for the bmad logger
+	Log         log.LogConfig         // Configuration for the bmad logger
 	Host        string                // Hostname that bmad is running on
 	Include_dir string                // Directory to include *.conf files from
 }
@@ -171,6 +173,12 @@ func LoadConfig(cfg_file string) (*Config, error) {
 		}
 		if check.Timeout <= 0 {
 			check.Timeout = MIN_INTERVAL - 1
+		}
+		if check.Bulk == "" {
+			check.Bulk = new_cfg.Bulk
+		}
+		if check.Report == "" {
+			check.Report = new_cfg.Report
 		}
 		if check.Env == nil {
 			check.Env = new_cfg.Env
