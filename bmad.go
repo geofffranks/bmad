@@ -269,9 +269,10 @@ func run_loop() () {
 				still_running = append(still_running, check)
 			} else {
 				log.Debug("%s reaped successfully", check.Name)
-				if err := bma.SendToBolo(output); err != nil {
-					log.Error("Error submitting check results for %s: %s", check.Name, err.Error())
-				}
+				go bma.SendToBolo(output)
+//				if err := bma.SendToBolo(output); err != nil {
+//					log.Error("Error submitting check results for %s: %s", check.Name, err.Error())
+//				}
 			}
 		}
 		in_flight = still_running
