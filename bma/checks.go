@@ -111,7 +111,9 @@ func (self *Check) Spawn() (error) {
 			return err
 		}
 		log.Debug("Running check %s as %q", self.Name, self.Run_as)
-		process.SysProcAttr = &syscall.SysProcAttr{Credential: &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)}}
+		process.SysProcAttr = &syscall.SysProcAttr{
+			Credential: &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)},
+		}
 	}
 
 	if err := process.Start(); err != nil {

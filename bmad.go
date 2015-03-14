@@ -234,6 +234,7 @@ func run_loop() () {
 	for {
 		if SHUTDOWN {
 			log.Info("Shutdown requested")
+			bma.DisconnectFromBolo()
 			break
 		}
 		if CFG_RELOAD {

@@ -4,8 +4,10 @@ import "github.com/geofffranks/bmad/log"
 import "os"
 import "os/exec"
 import shellwords "github.com/mattn/go-shellwords"
+import "syscall"
 
 var writer *os.File
+var send2bolo *exec.Cmd
 
 //FIXME: use zmq directly
 
@@ -24,20 +26,30 @@ func ConnectToBolo() (error) {
 		panic(err)
 	}
 	log.Debug("Spawning bolo submitter:  %#v", args)
-	proc := exec.Command(args[0], args[1:]...)
+	send2bolo = exec.Command(args[0], args[1:]...)
 	r, w, err := os.Pipe()
 	if (err != nil) {
 		panic(err)
 	}
-	proc.Stdin  = r
+	send2bolo.Stdin  = r
 	writer = w
-	err = proc.Start()
-	log.Debug("send_bolo: %#v", proc)
+	err = send2bolo.Start()
+	log.Debug("send_bolo: %#v", send2bolo)
 	if (err != nil) {
 		panic(err)
 	}
-	go proc.Wait()
+	go send2bolo.Wait()
 	return nil
+}
+
+func DisconnectFromBolo() () {
+	if send2bolo == nil {
+		log.Warn("Bolo disconnect requested, but send_bolo is not running")
+	}
+	pid := send2bolo.Process.Pid
+	if err:= syscall.Kill(pid, syscall.SIGTERM); err != nil {
+		log.Debug("send_bolo[%d] already terminated", pid)
+	}
 }
 
 // Sends an individual message from check output to bolo,
