@@ -42,7 +42,9 @@ func ConnectToBolo() (error) {
 	return nil
 }
 
-func DisconnectFromBolo() () {
+// Disconnects from bolo (terminates the send_bolo process)
+// If send_bolo is no longer running, does nothing.
+func DisconnectFromBolo() (error) {
 	if send2bolo == nil {
 		log.Warn("Bolo disconnect requested, but send_bolo is not running")
 	}
@@ -50,6 +52,9 @@ func DisconnectFromBolo() () {
 	if err:= syscall.Kill(pid, syscall.SIGTERM); err != nil {
 		log.Debug("send_bolo[%d] already terminated", pid)
 	}
+	// This function returns nil, and has an error return val, to make mango-doc
+	// happy. It apparently panics when you have a function without a return value
+	return nil
 }
 
 // Sends an individual message from check output to bolo,
