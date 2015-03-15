@@ -17,6 +17,16 @@
 // --help, -h
 //		Displays the help dialog
 //
+// Profiling:
+//
+// --cpuprofile
+//		Enables CPU Profiling
+// --memprofile
+//		Enables memory Profiling
+// --blockprofile
+//		Enables block/contention Profiling
+//
+//
 // CONFIGURATION
 //
 // bmad configs are YAML config files, describing global configuration, as
@@ -117,6 +127,7 @@
 //
 package main
 
+import "github.com/davecheney/profile"
 import "github.com/geofffranks/bmad/bma"
 import "github.com/geofffranks/bmad/log"
 import "code.google.com/p/getopt"
@@ -133,11 +144,14 @@ const TICK time.Duration = 100 * time.Millisecond
 var cfg *bma.Config
 
 func main() {
-	getopt.StringLong("config", 'c', "/etc/bmad.conf", "specifies alternative config file.", "/etc/bmad.conf")
-	getopt.BoolLong("test", 't', "ignore scheduling, and execute one run of all matching checks sequentially")
-	getopt.StringLong("match", 'm', ".", "regex for filtering checks for --test mode")
-	getopt.BoolLong("noop", 'n', "disable result submission to bolo (only used for --test mode)")
-	getopt.BoolLong("help", 'h', "display help dialog")
+	getopt.StringLong(  "config",       'c', "/etc/bmad.conf", "specifies alternative config file.", "/etc/bmad.conf")
+	getopt.BoolLong(    "test",         't',                   "ignore scheduling, and execute one run of all matching checks sequentially")
+	getopt.StringLong(  "match"  ,      'm', ".",              "regex for filtering checks for --test mode")
+	getopt.BoolLong(    "noop",         'n',                   "disable result submission to bolo (only used for --test mode)")
+	getopt.BoolLong(    "help",         'h',                   "display help dialog")
+	getopt.BoolLong(    "cpuprofile",    0,                    "Enables memory profiling")
+	getopt.BoolLong(    "memprofile",    0,                    "Enables memory profiling")
+	getopt.BoolLong(    "blockprofile",  0,                    "Enables memory profiling")
 
 	getopt.DisplayWidth = 80
 	getopt.HelpColumn   = 30
@@ -147,10 +161,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	if getopt.GetValue("cpuprofile") == "true" {
+		defer profile.Start(profile.CPUProfile).Stop()
+	}
+	if getopt.GetValue("memprofile") == "true" {
+		defer profile.Start(profile.MemProfile).Stop()
+	}
+	if getopt.GetValue("blockprofile") == "true" {
+		defer profile.Start(profile.BlockProfile).Stop()
+	}
+
 	var err error
 	cfg, err = bma.LoadConfig(getopt.GetValue("config"))
 	if err != nil {
-		panic(fmt.Sprintf("Couldn't parse config file %s: %s", getopt.GetValue("config"), err))
+		panic(fmt.Sprintf("Couldn't parse config file %s: %s", getopt.GetValue("config"), err.Error()))
 	}
 
 	log.Notice("bmad starting up")
