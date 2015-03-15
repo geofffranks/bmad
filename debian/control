@@ -9,6 +9,7 @@ Build-Depends: debhelper (>= 8),
                golang-getopt-dev,
                golang-goyaml-dev,
                golang-mangodoc,
+               golang-profile-dev,
                golang-shellwords-dev,
                golang-go
 
