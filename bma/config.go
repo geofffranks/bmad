@@ -51,12 +51,22 @@ func default_config() (*Config) {
 	return &cfg
 }
 
+var os_hostname = func() (string, error) {
+	return os.Hostname()
+}
+var net_lookuphost = func(h string) ([]string, error) {
+	return net.LookupHost(h)
+}
+var net_lookupaddr = func(a string) ([]string, error) {
+	return net.LookupAddr(a)
+}
+
 // Performes heuristics to determine the hostname of the current host.
 // Tries os.Hostname(), and if that isn't fully qualified (contains a '.'),
 // Fails over to finding the first hostname for the first IP of the host
 // that contains a '.'. If none do, fails back to the unqualified hostname.
 func hostname() (string) {
-	h, err  := os.Hostname()
+	h, err  := os_hostname()
 	if err != nil {
 		log.Error("Couldn't get hostname for current host: %s", err.Error())
 		return "unknown"
@@ -64,13 +74,13 @@ func hostname() (string) {
 	if strings.ContainsRune(h, '.') {
 		return h
 	}
-	addrs, err := net.LookupHost(h)
+	addrs, err := net_lookuphost(h)
 	if err != nil {
 //		log.Warn("Couldn't resolve FQDN of host: %s", err.Error());
 		return h
 	}
 	if len(addrs) > 0 {
-		names, err := net.LookupAddr(addrs[0])
+		names, err := net_lookupaddr(addrs[0])
 		if err != nil {
 	//		log.Warn("Couldn't resolve FQDN of host: %s", err.Error());
 			return h
