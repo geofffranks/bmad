@@ -37,7 +37,7 @@ func init() {
 	SetupLogging(LogConfig{ Type: "console", Level: "warning" })
 }
 // Does the needful to set up the logging subsystem based on the passed configuration data.
-func SetupLogging (cfg LogConfig) () {
+func SetupLogging (cfg LogConfig) {
 	var l logger
 
 	if cfg.Type == "syslog" {

@@ -5,7 +5,7 @@ DISTFILE=bmad-${VERSION}.tar.gz
 DEFAULT:
 	go install
 test:
-	go test
+	go test github.com/geofffranks/bmad github.com/geofffranks/bmad/bma  github.com/geofffranks/bmad/log
 version:
 	@echo ${VERSION}
 distfile:
@@ -17,6 +17,7 @@ docs:
 	mkdir -p doc
 	mango-doc -version=${VERSION}     > doc/bmad.1
 	mango-doc -version=${VERSION} bma > doc/bmad-bma.3
+	mango-doc -version=${VERSION} log > doc/bmad-log.3
 
 clean:
 	rm -rf doc
