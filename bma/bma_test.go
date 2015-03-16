@@ -59,3 +59,23 @@ func TestHostname(t *testing.T) {
 	assert.Equal(t, "test01", hostname(),
 		"hostname() falls back to os.Hostname() if no fqdns are found")
 }
+
+func TestDefaultConfig(t *testing.T) {
+	orig_osh := os_hostname
+	os_hostname = func () (string, error) {
+		return "test01.example.com", nil
+	}
+	defer func () { os_hostname = orig_osh }()
+	expect := Config{
+		Every:       300,
+		Retry_every: 60,
+		Retries:     1,
+		Timeout:     45,
+		Send_bolo:   "send_bolo -t stream",
+		Host:        "test01.example.com",
+		Include_dir: "/etc/bmad.d",
+		Checks:      map[string]*Check{},
+		Env:         map[string]string{},
+	}
+	assert.Equal(t, &expect, default_config(), "default_config() returns expected config")
+}
