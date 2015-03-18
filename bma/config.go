@@ -3,6 +3,7 @@
 // bmad logic for configuration management, check execution, and data submission.
 package bma
 
+import "errors"
 import "github.com/geofffranks/bmad/log"
 import "launchpad.net/goyaml"
 import "io/ioutil"
@@ -112,14 +113,14 @@ func LoadConfig(cfg_file string) (*Config, error) {
 		return cfg, err
 	}
 
-	log.SetupLogging(new_cfg.Log)
-
 	if new_cfg.Include_dir != "" {
+		log.Debug("Loading auxillary configs from %s", new_cfg.Include_dir)
 		files, err := filepath.Glob(new_cfg.Include_dir + "/*.conf")
 		if err != nil {
 			log.Warn("Couldn't find include files: %s", err.Error())
 		} else {
 			for _, file := range(files) {
+				log.Debug("Loading auxillary config: %s", file)
 				source, err := ioutil.ReadFile(file)
 				if err != nil {
 					log.Warn("Couldn't read %q: %s", file, err.Error())
@@ -145,82 +146,100 @@ func LoadConfig(cfg_file string) (*Config, error) {
 	}
 
 	for name, check := range new_cfg.Checks {
-		if check.Name == "" {
-			check.Name = name
-		}
-		if check.Command == "" {
-			log.Error("Unspecified command for %s - ignoring check", check.Name)
+		if err :=initialize_check(name, check, new_cfg); err != nil {
+			log.Error("Invalid check config for %s: %s (skipping)", name, err.Error())
+			delete(new_cfg.Checks, name)
 			continue
-		} else {
-			check.cmd_args, err = shellwords.Parse(check.Command)
-			if err != nil {
-				log.Error("Couldn't parse %s's command `%s` into arguments: %q - ignoring check",
-					check.Name, check.Command, err)
-			}
-		}
-		if check.Every <= 0 {
-			check.Every = new_cfg.Every
-		} else if check.Every <= MIN_INTERVAL {
-			check.Every = MIN_INTERVAL
-		}
-		if check.Every <= 0 {
-			check.Every = MIN_INTERVAL * 30
-		}
-		if check.Retry_every <= 0 {
-			check.Retry_every = new_cfg.Retry_every
-		}
-		if check.Retry_every > check.Every {
-			check.Retry_every = check.Every
-		}
-		if check.Retries <= 0 {
-			check.Retries = new_cfg.Retries
-		}
-		if check.Timeout <= 0 {
-			check.Timeout = new_cfg.Timeout
-		}
-		if check.Timeout >= check.Retry_every || check.Timeout <= 0 {
-			check.Timeout = check.Retry_every - 1
-		}
-		if check.Timeout <= 0 {
-			check.Timeout = MIN_INTERVAL - 1
-		}
-		if check.Bulk == "" {
-			check.Bulk = new_cfg.Bulk
-		}
-		if check.Report == "" {
-			check.Report = new_cfg.Report
-		}
-		if check.Env == nil {
-			check.Env = new_cfg.Env
-		} else {
-			for env, val := range new_cfg.Env {
-				if _, ok := check.Env[env]; !ok {
-					check.Env[env] = val
-				}
-			}
 		}
 
-		check.next_run = time.Now().Add(time.Duration(rand.Int63n(check.Every * int64(time.Second))))
 		if (cfg != nil) {
 			if val, ok := cfg.Checks[check.Name]; ok {
-				check.next_run   = val.next_run
-				check.started_at = val.started_at
-				check.ended_at   = val.ended_at
-				check.duration   = val.duration
-				check.attempts   = val.attempts
-				check.rc         = val.rc
-				check.latency    = val.latency
-				check.stdout     = val.stdout
-				check.stderr     = val.stderr
-				check.sig_term   = val.sig_term
-				check.sig_kill   = val.sig_kill
-				check.process    = val.process
+				merge_checks(check, val)
 			}
 		}
 		log.Debug("Check %s defined as %#v", check.Name, check)
 	}
 
 	cfg = new_cfg
+	log.SetupLogging(cfg.Log)
 	log.Debug("Config successfully loaded as: %#v", cfg)
 	return cfg, nil
+}
+
+var first_run = func (interval int64) (time.Time) {
+	return time.Now().Add(time.Duration(rand.Int63n(interval * int64(time.Second))))
+}
+
+func merge_checks(check *Check, old *Check) {
+	check.next_run   = old.next_run
+	check.started_at = old.started_at
+	check.ended_at   = old.ended_at
+	check.duration   = old.duration
+	check.attempts   = old.attempts
+	check.rc         = old.rc
+	check.latency    = old.latency
+	check.stdout     = old.stdout
+	check.stderr     = old.stderr
+	check.sig_term   = old.sig_term
+	check.sig_kill   = old.sig_kill
+	check.process    = old.process
+}
+
+func initialize_check(name string, check *Check, defaults *Config) (error) {
+	if check.Name == "" {
+		check.Name = name
+	}
+	if check.Command == "" {
+		return errors.New("unspecified command")
+	} else {
+		var err error
+		check.cmd_args, err = shellwords.Parse(check.Command)
+		if err != nil {
+			log.Error("Couldn't parse %s's command `%s` into arguments: %q - ignoring check",
+				check.Name, check.Command, err)
+		}
+	}
+	if check.Every <= 0 {
+		check.Every = defaults.Every
+	} else if check.Every <= MIN_INTERVAL {
+		check.Every = MIN_INTERVAL
+	}
+	if check.Every <= 0 {
+		check.Every = MIN_INTERVAL * 30
+	}
+	if check.Retry_every <= 0 {
+		check.Retry_every = defaults.Retry_every
+	}
+	if check.Retry_every > check.Every {
+		check.Retry_every = check.Every
+	}
+	if check.Retries <= 0 {
+		check.Retries = defaults.Retries
+	}
+	if check.Timeout <= 0 {
+		check.Timeout = defaults.Timeout
+	}
+	if check.Timeout >= check.Retry_every || check.Timeout <= 0 {
+		check.Timeout = check.Retry_every - 1
+	}
+	if check.Timeout <= 0 {
+		check.Timeout = MIN_INTERVAL - 1
+	}
+	if check.Bulk == "" {
+		check.Bulk = defaults.Bulk
+	}
+	if check.Report == "" {
+		check.Report = defaults.Report
+	}
+	if check.Env == nil {
+		check.Env = defaults.Env
+	} else {
+		for env, val := range defaults.Env {
+			if _, ok := check.Env[env]; !ok {
+				check.Env[env] = val
+			}
+		}
+	}
+	check.next_run = first_run(check.Every)
+	return nil
 }

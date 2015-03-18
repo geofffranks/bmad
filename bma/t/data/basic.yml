@@ -1,0 +1,19 @@
+send_bolo: t/bin/send_bolo
+
+timeout: 5
+every: 10
+retry_every: 6
+retries: 2
+
+include_dir: t/data/bmad.empty
+
+log:
+  level: warning
+  type: file
+  file: /dev/null
+
+checks:
+  first:
+    command: echo "success"
+  second:
+    every: 100

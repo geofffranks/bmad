@@ -3,6 +3,8 @@ package bma
 import "testing"
 import "github.com/stretchr/testify/assert"
 import "errors"
+import "os"
+import "time"
 
 func TestHostname(t *testing.T) {
 	orig_osh := os_hostname
@@ -78,4 +80,80 @@ func TestDefaultConfig(t *testing.T) {
 		Env:         map[string]string{},
 	}
 	assert.Equal(t, &expect, default_config(), "default_config() returns expected config")
+}
+
+func TestLoadConfig(t *testing.T) {
+	orig_osh := os_hostname
+	os_hostname = func () (string, error) {
+		return "test01.example.com", nil
+	}
+	defer func () { os_hostname = orig_osh }()
+	orig_first_run := first_run
+	first_run = func (i int64) (time.Time) { return time.Unix(42,0) }
+	defer func () { first_run = orig_first_run }()
+
+	cfg = nil // Reset cfg
+	_, err := LoadConfig("doesntexist")
+	assert.IsType(t, &os.PathError{}, err, "LoadConfig() on non-existent config file returns an error")
+
+	cfg = nil // Reset cfg
+	_, err = LoadConfig("t/data/bad.yml")
+	assert.EqualError(t, err, "YAML error: line 1: found unexpected end of stream",
+		"LoadConfig() on bad yaml returns an error")
+
+	cfg = nil // Reset cfg
+	got, err := LoadConfig("t/data/basic.yml")
+	assert.Nil(t, err, "LoadConfig() on valid yaml doesn't return an error")
+	expect := default_config()
+	expect.Send_bolo   = "t/bin/send_bolo"
+	expect.Include_dir = "t/data/bmad.empty"
+	expect.Every       = 10
+	expect.Retry_every = 6
+	expect.Retries     = 2
+	expect.Timeout     = 5
+	expect.Log.Level   = "warning"
+	expect.Log.Type    = "file"
+	expect.Log.File    = "/dev/null"
+	expect.Checks["first"] = &Check{
+		Command:     "echo \"success\"",
+		Every:       10,
+		Retry_every: 6,
+		Retries:     2,
+		Timeout:     5,
+		Env:         map[string]string{},
+		Name:        "first",
+		cmd_args:    []string{"echo", "success"},
+		next_run:    time.Unix(42,0),
+	}
+	// There is a "second" key in the yaml file, with no check command
+	// found. It should be ingored on config load, so we don't run it needlessly
+	// Do not expect it.
+
+	assert.Equal(t, expect, got, "LoadConfig('t/data/basic.yml') provided expected config")
+
+	cfg = nil // Reset cfg
+	os.Chmod("t/data/bmad.d/unreadable.conf", 0200)
+	got, err = LoadConfig("t/data/extended.yml")
+	os.Chmod("t/data/bmad.d/unreadable.conf", 0644)
+	// This directory should have both a more.conf (parseable), and a bad.conf (unparseable)
+	expect.Include_dir = "t/data/bmad.d"
+	expect.Checks["third"] = &Check{
+		Command:     "echo \"third success\"",
+		Every:       30,
+		Retry_every: 25,
+		Retries:     10,
+		Timeout:     20,
+		Env:         map[string]string{},
+		Name:        "third",
+		cmd_args:    []string{"echo", "third success"},
+		next_run:    time.Unix(42,0),
+	}
+	// There is a redefinition of "second" in t/data/bmad.d/more.yml.
+	// Unfortunately, bmad takes the first earliest found definition,
+	// and skips the rest. Since the earliest was defined improperly,
+	// it's skipped over still. Don't expect it.
+
+	assert.Equal(t, expect, got, "LoadConfig('t/data/extended.yml') provided expected config")
+
+	//FIXME: test reconfiguration
 }
