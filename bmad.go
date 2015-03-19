@@ -269,6 +269,7 @@ func run_loop() () {
 				log.Error("Couldn't reload config: %s", err.Error())
 			}
 			CFG_RELOAD = false
+			//FIXME: respawn send_bolo
 		}
 		if CFG_DUMP {
 			log.Info("Configuration dump requested")

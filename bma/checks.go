@@ -70,6 +70,23 @@ func (self *Check) environment() ([]string) {
 	}
 	return env
 }
+// Merges relavent data from an old check into the new check
+// so that upon config reload, we can retain state properly
+func merge_checks(check *Check, old *Check) {
+	check.next_run   = old.next_run
+	check.started_at = old.started_at
+	check.ended_at   = old.ended_at
+	check.duration   = old.duration
+	check.attempts   = old.attempts
+	check.rc         = old.rc
+	check.latency    = old.latency
+	check.stdout     = old.stdout
+	check.stderr     = old.stderr
+	check.sig_term   = old.sig_term
+	check.sig_kill   = old.sig_kill
+	check.process    = old.process
+	check.running    = old.running
+}
 
 // Schedules the next run of the Check. If interval is
 // not provided, defaults to the Every value of the Check.

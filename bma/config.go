@@ -4,6 +4,7 @@
 package bma
 
 import "errors"
+import "fmt"
 import "github.com/geofffranks/bmad/log"
 import "launchpad.net/goyaml"
 import "io/ioutil"
@@ -77,13 +78,13 @@ func hostname() (string) {
 	}
 	addrs, err := net_lookuphost(h)
 	if err != nil {
-//		log.Warn("Couldn't resolve FQDN of host: %s", err.Error());
+		log.Warn("Couldn't resolve FQDN of host: %s", err.Error());
 		return h
 	}
 	if len(addrs) > 0 {
 		names, err := net_lookupaddr(addrs[0])
 		if err != nil {
-	//		log.Warn("Couldn't resolve FQDN of host: %s", err.Error());
+			log.Warn("Couldn't resolve FQDN of host: %s", err.Error());
 			return h
 		}
 		for _, name := range(names) {
@@ -170,33 +171,21 @@ var first_run = func (interval int64) (time.Time) {
 	return time.Now().Add(time.Duration(rand.Int63n(interval * int64(time.Second))))
 }
 
-func merge_checks(check *Check, old *Check) {
-	check.next_run   = old.next_run
-	check.started_at = old.started_at
-	check.ended_at   = old.ended_at
-	check.duration   = old.duration
-	check.attempts   = old.attempts
-	check.rc         = old.rc
-	check.latency    = old.latency
-	check.stdout     = old.stdout
-	check.stderr     = old.stderr
-	check.sig_term   = old.sig_term
-	check.sig_kill   = old.sig_kill
-	check.process    = old.process
-}
-
 func initialize_check(name string, check *Check, defaults *Config) (error) {
 	if check.Name == "" {
 		check.Name = name
 	}
+	if check.Name == "" {
+		return errors.New("No check name specified")
+	}
 	if check.Command == "" {
-		return errors.New("unspecified command")
+		return errors.New("Unspecified command")
 	} else {
 		var err error
 		check.cmd_args, err = shellwords.Parse(check.Command)
 		if err != nil {
-			log.Error("Couldn't parse %s's command `%s` into arguments: %q - ignoring check",
-				check.Name, check.Command, err)
+		return errors.New(fmt.Sprintf("Unable to parse command `%s`: %s",
+				check.Command, err.Error()))
 		}
 	}
 	if check.Every <= 0 {
@@ -213,8 +202,14 @@ func initialize_check(name string, check *Check, defaults *Config) (error) {
 	if check.Retry_every > check.Every {
 		check.Retry_every = check.Every
 	}
+	if check.Retry_every <= 0 {
+		check.Retry_every = check.Every
+	}
 	if check.Retries <= 0 {
 		check.Retries = defaults.Retries
+	}
+	if check.Retries <= 0 {
+		check.Retries = 1
 	}
 	if check.Timeout <= 0 {
 		check.Timeout = defaults.Timeout
@@ -222,24 +217,24 @@ func initialize_check(name string, check *Check, defaults *Config) (error) {
 	if check.Timeout >= check.Retry_every || check.Timeout <= 0 {
 		check.Timeout = check.Retry_every - 1
 	}
-	if check.Timeout <= 0 {
-		check.Timeout = MIN_INTERVAL - 1
-	}
+
 	if check.Bulk == "" {
 		check.Bulk = defaults.Bulk
 	}
 	if check.Report == "" {
 		check.Report = defaults.Report
 	}
-	if check.Env == nil {
-		check.Env = defaults.Env
-	} else {
-		for env, val := range defaults.Env {
-			if _, ok := check.Env[env]; !ok {
-				check.Env[env] = val
-			}
+
+	for key, val := range defaults.Env {
+		if _, ok := check.Env[key]; !ok {
+			check.Env[key] = val
 		}
 	}
+	if check.Env == nil {
+		check.Env = map[string]string{}
+	}
+
 	check.next_run = first_run(check.Every)
+
 	return nil
 }

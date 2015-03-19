@@ -155,5 +155,149 @@ func TestLoadConfig(t *testing.T) {
 
 	assert.Equal(t, expect, got, "LoadConfig('t/data/extended.yml') provided expected config")
 
-	//FIXME: test reconfiguration
+	delete(expect.Checks, "third")
+	expect.Include_dir = "t/data/bmad.empty"
+	expect.Send_bolo   = "t/bin/send_bolo2"
+	expect.Every       = 100
+	expect.Retry_every = 60
+	expect.Retries     = 10
+	expect.Timeout     = 50
+	expect.Log.Level   = "debug"
+	expect.Log.Type    = "file"
+	expect.Log.File    = "/dev/null"
+	expect.Checks["first"].Every       = 100
+	expect.Checks["first"].Retry_every = 60
+	expect.Checks["first"].Retries     = 10
+	expect.Checks["first"].Timeout     = 50
+
+	got, err = LoadConfig("t/data/reloaded.yml")
+	assert.Equal(t, expect, got, "LoadConfig('t/data/reloaded.yml') updates config properly on reload")
+	//FIXME: respawn send2bolo testing
+}
+
+func Test_initialize_check(t *testing.T) {
+	orig_first_run := first_run
+	first_run = func (i int64) (time.Time) { return time.Unix(42,0) }
+	defer func () { first_run = orig_first_run }()
+
+	cfg := default_config()
+	c := Check{ Command: "test" }
+
+	expect := Check{
+		Command:     "test",
+		Every:       300,
+		Retries:     1,
+		Retry_every: 60,
+		Timeout:     45,
+		Env:         map[string]string{},
+		Run_as:      "",
+		Bulk:        "",
+		Report:      "",
+		Name:        "mycheck",
+		cmd_args:    []string{"test"},
+		next_run:    time.Unix(42,0),
+	}
+	err := initialize_check("mycheck", &c, cfg)
+	assert.Nil(t, err, "No errors returned from initialize_check")
+	assert.Equal(t, expect, c, "initialize_check() basic initialization case succeeds")
+
+	c.Timeout = 0
+	initialize_check("mycheck", &c, cfg)
+	assert.Nil(t, err, "No errors returned from initialize_check")
+	assert.Equal(t, expect, c, "checks with negative timeouts get default timeout")
+
+	c.Timeout = 0
+	cfg.Timeout = 0
+	expect.Timeout = 59
+	err = initialize_check("mycheck", &c, cfg)
+	assert.Nil(t, err, "No errors returned from initialize_check")
+	assert.Equal(t, expect, c, "when no default timeout or check timeout, you get Retry_every - 1")
+
+	c.Retry_every = -1
+	err = initialize_check("mycheck", &c, cfg)
+	assert.Nil(t, err, "No errors returned from initialize_check")
+	assert.Equal(t, expect, c, "negative Retry_every gets default Retry_every")
+
+	c.Retry_every = 0
+	cfg.Retry_every = 0
+	err = initialize_check("mycheck", &c, cfg)
+	expect.Retry_every = 300
+	assert.Nil(t, err, "No errors returned from initialize_check")
+	assert.Equal(t, expect, c, "No default Retry_every and no Retry_every gets Every")
+
+	c.Retry_every = 500
+	err = initialize_check("mycheck", &c, cfg)
+	assert.Nil(t, err, "No errors returned from initialize_check")
+	assert.Equal(t, expect, c, "Retry_every above Every gets reset to Every")
+
+	c.Retries = -1
+	err = initialize_check("mycheck", &c, cfg)
+	assert.Nil(t, err, "No errors returned from initialize_check")
+	assert.Equal(t, expect, c, "negative Retries gets default Retries")
+
+	c.Retries = 0
+	cfg.Retries = 0
+	err = initialize_check("mycheck", &c, cfg)
+	assert.Nil(t, err, "No errors returned from initialize_check")
+	assert.Equal(t, expect, c, "No retries or default retries gets retries of 1")
+
+	c.Every = -1
+	err = initialize_check("mycheck", &c, cfg)
+	assert.Nil(t, err, "No errors returned from initialize_check")
+	assert.Equal(t, expect, c, "checks with negative intervals are reset to default")
+
+	c.Every = 1
+	expect.Every = 10
+	expect.Retry_every = 10
+	expect.Timeout = 9
+	err = initialize_check("mycheck", &c, cfg)
+	assert.Nil(t, err, "No errors returned from initialize_check")
+	assert.Equal(t, expect, c, "checks with intervals < MIN_INTERVAL get MIN_INTERVAL")
+
+	cfg.Every = 0
+	c.Every = 0
+	expect.Every = 300
+	err = initialize_check("mycheck", &c, cfg)
+	assert.Nil(t, err, "No errors returned from initialize_check")
+	assert.Equal(t, expect, c, "checks with no interval or default interval get 30 * MIN_INTERVAL")
+
+	cfg.Env["top"]   = "top"
+	cfg.Env["mixed"] = "top"
+	c.Env["mixed"]  = "bottom"
+	c.Env["bottom"] = "bottom"
+	expect.Env = map[string]string{"top": "top", "mixed": "bottom", "bottom": "bottom"}
+	err = initialize_check("mycheck", &c, cfg)
+	assert.Nil(t, err, "No errors returned from initialize_check")
+	assert.Equal(t, expect, c, "Env is merged properly between global config and check config")
+
+	c.Name        = "overridden"
+	c.Every       = 60
+	c.Retry_every = 30
+	c.Timeout     = 15
+	c.Retries     = 5
+	c.Bulk        = "true"
+	c.Report      = "true"
+	expect.Name        = "overridden"
+	expect.Every       = 60
+	expect.Retry_every = 30
+	expect.Timeout     = 15
+	expect.Retries     = 5
+	expect.Bulk        = "true"
+	expect.Report      = "true"
+	err = initialize_check("mycheck", &c, cfg)
+	assert.Nil(t, err, "No errors returned from initialize_check")
+	assert.Equal(t, expect, c, "check specific values are preferred over globals")
+
+	c.Name = ""
+	err = initialize_check("", &c, cfg)
+	assert.EqualError(t, err, "No check name specified", "no name to the check throws an error")
+
+	c.Command = ""
+	err = initialize_check("mycheck", &c, cfg)
+	assert.EqualError(t, err, "Unspecified command", "no command to the check throws an error")
+
+	c.Command = "`should error"
+	err = initialize_check("mycheck", &c, cfg)
+	assert.EqualError(t, err, "Unable to parse command ``should error`: invalid command line string",
+		"shell words parsing failures propagate properly")
 }
