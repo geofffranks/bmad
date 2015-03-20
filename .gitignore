@@ -2,3 +2,4 @@ obj-x86_64-linux-gnu/
 doc/
 *.pprof
 bmad
+bma/t/tmp

@@ -23,22 +23,24 @@ var send2bolo *exec.Cmd
 func ConnectToBolo() (error) {
 	args, err := shellwords.Parse(cfg.Send_bolo)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	log.Debug("Spawning bolo submitter:  %#v", args)
 	send2bolo = exec.Command(args[0], args[1:]...)
 	r, w, err := os.Pipe()
 	if (err != nil) {
-		panic(err)
+		return err
 	}
 	send2bolo.Stdin  = r
 	writer = w
 	err = send2bolo.Start()
-	log.Debug("send_bolo: %#v", send2bolo)
 	if (err != nil) {
-		panic(err)
+		writer = nil
+		send2bolo = nil
+		return err
 	}
-	go send2bolo.Wait()
+	log.Debug("send_bolo: %#v", send2bolo)
+	go func () { send2bolo.Wait(); send2bolo = nil }()
 	return nil
 }
 
@@ -47,6 +49,7 @@ func ConnectToBolo() (error) {
 func DisconnectFromBolo() {
 	if send2bolo == nil {
 		log.Warn("Bolo disconnect requested, but send_bolo is not running")
+		return
 	}
 	pid := send2bolo.Process.Pid
 	if err:= syscall.Kill(pid, syscall.SIGTERM); err != nil {
