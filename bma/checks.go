@@ -248,12 +248,14 @@ func (self *Check) Reap() (string, bool) {
 	output = output + fmt.Sprintf("SAMPLE %d %s:bmad:%s:exec-time %0.4f\n",
 		time.Now().Unix(), cfg.Host, self.Name, self.duration.Seconds())
 	// bmad overall check throughput measurement
+	//FIXME: figure out the right way to not calculate/report check throughput  under single-use mode
 	output = output + fmt.Sprintf("COUNTER %d %s:bmad:checks\n",
 		time.Now().Unix(), cfg.Host)
 	// bmad avg check runtime
 	output = output + fmt.Sprintf("SAMPLE %d %s:bmad:exec-time %0.4f\n",
 		time.Now().Unix(), cfg.Host, self.duration.Seconds())
 	// bmad avg check latency
+	//FIXME: figure out the right way to not calculate/report latency under single-use mode
 	output = output + fmt.Sprintf("SAMPLE %d %s:bmad:latency %0.4f\n",
 		time.Now().Unix(), cfg.Host, self.latency.Seconds())
 
