@@ -43,6 +43,8 @@ type Check struct {
 	attempts     int
 	stdout      *bytes.Buffer
 	stderr      *bytes.Buffer
+	output       string
+	err_msg      string
 
 	started_at   time.Time
 	ended_at     time.Time
@@ -82,6 +84,8 @@ func merge_checks(check *Check, old *Check) {
 	check.latency    = old.latency
 	check.stdout     = old.stdout
 	check.stderr     = old.stderr
+	check.output     = old.output
+	check.err_msg    = old.err_msg
 	check.sig_term   = old.sig_term
 	check.sig_kill   = old.sig_kill
 	check.process    = old.process
@@ -113,6 +117,8 @@ func (self *Check) Spawn() (error) {
 	var e bytes.Buffer
 	process.Stdout = &o
 	process.Stderr = &e
+	self.output  = ""
+	self.err_msg = ""
 
 	if self.Run_as != "" {
 		u, err := user.Lookup(self.Run_as)
@@ -154,8 +160,8 @@ func (self *Check) Spawn() (error) {
 // Called on running checks, to determine if they have finished
 // running.
 //
-// If the Check has not finished executing, returns an empty
-// string, and false. If not, returns an empty string, and false.
+// If the Check has not finished executing, returns false.
+//
 // If the Check has been running for longer than its Timeout,
 // a SIGTERM (and failing that a SIGKILL) is issued to forcibly
 // terminate the rogue Check process. In either case, this returns
@@ -163,11 +169,11 @@ func (self *Check) Spawn() (error) {
 // called again to fully reap the Check
 //
 // If the Check has finished execution (on its own, or via forced
-// termination), it will return the check output, and true.
+// termination), it will return true.
 //
 // Once complete, some additional meta-stats for the check execution
 // are appended to the check output, to be submit up to bolo
-func (self *Check) Reap() (string, bool) {
+func (self *Check) Reap() (bool) {
 	pid := self.process.Process.Pid
 
 	//FIXME:  verify large buffer output doesn't cause deadlocking
@@ -175,7 +181,7 @@ func (self *Check) Reap() (string, bool) {
 	status, err := syscall.Wait4(pid, &ws, syscall.WNOHANG, nil);
 	if err != nil {
 		log.Error("Error waiting on check %s[%d]: %s", self.Name, pid, err.Error())
-		return "", false
+		return false
 	}
 	if status == 0 {
 		// self to see if we need to sigkill due to failed sigterm
@@ -187,22 +193,22 @@ func (self *Check) Reap() (string, bool) {
 			self.sig_kill = true
 		}
 		// self to see if we need to sigterm due to self timeout expiry
-		if time.Now().After(self.started_at.Add(time.Duration(self.Timeout) * time.Second)) {
+		if ! self.sig_kill && time.Now().After(self.started_at.Add(time.Duration(self.Timeout) * time.Second)) {
 			log.Warn("Check %s[%d] has been running too long, sending SIGTERM", self.Name, pid)
 			if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
 				log.Error("Error sending SIGTERM to check %s[%d]: %s", self.Name, pid, err.Error())
 			}
 			self.sig_term = true
 		}
-		return "", false
+		return false
 	}
 
 	self.ended_at = time.Now()
 	self.running  = false
 	self.duration = time.Since(self.started_at)
 	self.latency  = self.started_at.Sub(self.next_run)
-	output       := string(self.stdout.Bytes())
-	err_msg      := string(self.stderr.Bytes())
+	self.output   = string(self.stdout.Bytes())
+	self.err_msg  = string(self.stderr.Bytes())
 
 	if (ws.Exited()) {
 		self.rc = ws.ExitStatus()
@@ -214,15 +220,19 @@ func (self *Check) Reap() (string, bool) {
 		log.Debug("Check %s[%d] returned with an invalid exit code. Setting rc to UNKOWN", self.Name, pid)
 		self.rc = UNKNOWN
 	}
-	if (self.Bulk != "true" && self.rc != OK && self.attempts < self.Retries) {
-		self.schedule(self.started_at, self.Retry_every)
-		self.attempts++
-	} else {
-		if (self.rc == OK) {
+
+	self.schedule(self.started_at, self.Every)
+	if self.Bulk != "true" {
+		if self.rc != OK {
+			self.attempts++
+			if self.attempts < self.Retries {
+				self.schedule(self.started_at, self.Retry_every)
+			}
+		} else {
 			self.attempts = 0
 		}
-		self.schedule(self.started_at, self.Every)
 	}
+
 	if self.ended_at.After(self.next_run) {
 		timeout_triggered := "not reached"
 		if self.sig_term || self.sig_kill {
@@ -231,7 +241,11 @@ func (self *Check) Reap() (string, bool) {
 		log.Warn("Check %s[%d] took %0.3f seconds to run, at interval %d (timeout of %d was %s)",
 			self.Name, pid, self.duration.Seconds(), self.Every, self.Timeout, timeout_triggered)
 	}
+	return true
+}
 
+func (self *Check) Submit(full_stats bool) (error) {
+	//FIXME: figure out what to do about attempts/retries
 	// Add meta-stats for bmad
 	var msg string
 	if (self.Bulk == "true" && self.Report == "true") {
@@ -239,32 +253,41 @@ func (self *Check) Reap() (string, bool) {
 		if self.rc == OK {
 			msg = self.Name + " completed successfully!"
 		} else {
-			msg = strings.Replace(err_msg, "\n", " ", -1)
+			msg = strings.Replace(self.err_msg, "\n", " ", -1)
 		}
-		output = output + fmt.Sprintf("STATE %d %s:bmad:%s %d %s\n",
+		self.output = self.output + fmt.Sprintf("\nSTATE %d %s:bmad:%s %d %s",
 			time.Now().Unix(), cfg.Host, self.Name, self.rc, msg)
 	}
 	// check-specific runtime
-	output = output + fmt.Sprintf("SAMPLE %d %s:bmad:%s:exec-time %0.4f\n",
+	self.output = self.output + fmt.Sprintf("\nSAMPLE %d %s:bmad:%s:exec-time %0.4f",
 		time.Now().Unix(), cfg.Host, self.Name, self.duration.Seconds())
-	// bmad overall check throughput measurement
-	//FIXME: figure out the right way to not calculate/report check throughput  under single-use mode
-	output = output + fmt.Sprintf("COUNTER %d %s:bmad:checks\n",
-		time.Now().Unix(), cfg.Host)
 	// bmad avg check runtime
-	output = output + fmt.Sprintf("SAMPLE %d %s:bmad:exec-time %0.4f\n",
+	self.output = self.output + fmt.Sprintf("\nSAMPLE %d %s:bmad:exec-time %0.4f",
 		time.Now().Unix(), cfg.Host, self.duration.Seconds())
-	// bmad avg check latency
-	//FIXME: figure out the right way to not calculate/report latency under single-use mode
-	output = output + fmt.Sprintf("SAMPLE %d %s:bmad:latency %0.4f\n",
-		time.Now().Unix(), cfg.Host, self.latency.Seconds())
 
-	log.Debug("%s output: %s", self.Name, output)
+	if full_stats {
+		// bmad avg check latency
+		self.output = self.output + fmt.Sprintf("\nSAMPLE %d %s:bmad:latency %0.4f",
+			time.Now().Unix(), cfg.Host, self.latency.Seconds())
+		// bmad overall check throughput measurement
+		self.output = self.output + fmt.Sprintf("\nCOUNTER %d %s:bmad:checks",
+			time.Now().Unix(), cfg.Host)
+	}
 
-	return output, true
+	self.output = self.output + "\n"
+	log.Debug("%s output: %s", self.Name, self.output)
+	err := SendToBolo(self.output)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Determines whether or not a Check should be run
 func (self *Check) ShouldRun() (bool) {
 	return ! self.running && time.Now().After(self.next_run)
+}
+
+func (self *Check) Output() (string) {
+	return self.output
 }

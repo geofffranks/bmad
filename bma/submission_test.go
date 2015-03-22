@@ -16,7 +16,7 @@ func Test_SendToBolo(t *testing.T) {
 	writer = w
 	defer func () { writer =  nil }()
 
-	w.Write([]byte("Test message through bolo"))
+	SendToBolo("Test message through bolo")
 	n, err := r.Read(buffer)
 	assert.Equal(t, "Test message through bolo", string(buffer), "We're able to read what we wrote")
 	assert.Equal(t, 25, n, "Read 25 bytes")

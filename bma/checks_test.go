@@ -1,8 +1,12 @@
 package bma
 
 import "testing"
+import "fmt"
+import "os"
 import "os/exec"
+import "os/user"
 import "github.com/stretchr/testify/assert"
+import "regexp"
 import "time"
 import "bytes"
 
@@ -105,4 +109,233 @@ func Test_schedule(t *testing.T) {
 
 	check.schedule(time.Unix(42,0), 60)
 	assert.Equal(t, time.Unix(102,0), check.next_run, "scheduling a check with an interval uses that interval")
+}
+
+func (check *Check) test(t *testing.T, expect_out string, expect_rc int, message string) {
+	if message == "" {
+		message = "test_check"
+	}
+	err := check.Spawn()
+	if ! assert.True(t, check.running, "%s: check.running is true post-spawn", message) {
+		t.Fatalf("Couldn't spawn check, bailing out: %s", err.Error())
+	}
+	assert.NoError(t, err, "%s: no errors on successful spawning of check", message)
+	assert.NotNil(t, check.process, "%s: check has a process", message)
+	assert.WithinDuration(t, time.Now(), check.started_at, 1 * time.Second,
+		"%s check started within 1 second from now", message)
+	assert.Equal(t, check.ended_at, time.Time{}, "%s: check has no end time (yet)", message)
+	assert.False(t, check.sig_term, "%s: check has not been sigtermed", message)
+	assert.False(t, check.sig_kill, "%s: check has not been sigkilled", message)
+
+	var finished bool
+	for i := 0; i < 100; i++ {
+		finished = check.Reap()
+		if (finished) {
+			break;
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	assert.True(t,  finished, "%s: check finished", message)
+	assert.Equal(t, expect_out, check.output, "%s: check output was as expected", message)
+	assert.Equal(t, expect_rc,  check.rc,     "%s: check rc was as expected", message)
+	assert.False(t, check.running, "%s: check is no longer running", message)
+
+}
+
+func Test_check_lifecycle(t *testing.T) {
+	pwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Couldn't get working directory of tests: %s", err.Error())
+	}
+	whoami, err := user.Current()
+	if err != nil {
+		t.Fatalf("Couldn't find current user. Bailing out: %s", err.Error())
+	}
+	cfg = &Config{
+		Host: "test01.example.com",
+	}
+	check := Check{
+		cmd_args: []string{"t/bin/not_a_check"},
+		Env:      map[string]string{"VAR1": "is set"},
+		Name:     "test_check",
+		Every:    300,
+		Timeout:  1,
+		running:  true,
+		process:  &exec.Cmd{
+			Process: &os.Process{
+				Pid: 1234567,
+			},
+		},
+	}
+
+	test_check := pwd + "/t/bin/test_check"
+	expect_out := fmt.Sprintf("VAR1 is set\nRunning as '%s'\n", whoami.Username)
+
+	err = check.Spawn()
+	assert.EqualError(t, err, "check test_check[1234567] is already running",
+		"check.Spawn() fails if already running")
+
+	finished := check.Reap()
+	assert.False(t, finished, "Reap() on an inactive check returns false")
+
+	check.running = false
+	check.process = nil
+	err = check.Spawn()
+	assert.EqualError(t, err, "exec: \"t/bin/not_a_check\": stat t/bin/not_a_check: no such file or directory",
+		"check.Spawn() fails on bad command")
+
+	check.cmd_args = []string{test_check, "hang", "0"}
+	check.test(t, expect_out, 3, "hanging check")
+
+	assert.True(t, check.sig_term, "check was sigtermed")
+	assert.True(t, check.sig_kill, "check was sigkilled")
+	assert.WithinDuration(t, time.Now(), check.ended_at, 1 * time.Second,
+		"check ended within 1 second from now")
+	assert.InDelta(t, 3.5 * float64(time.Second), float64(check.duration), 0.6 * float64(time.Second),
+		"check duration is between 3 and 4 seconds")
+	assert.Equal(t, check.started_at.Sub(time.Time{}), check.latency, "check latency checks out")
+	assert.Equal(t, check.started_at.Add(time.Duration(check.Every) * time.Second), check.next_run,
+		"next run for check is scheduled")
+
+	check.cmd_args = []string{test_check, "2"}
+	check.test(t, expect_out, 2, "CRITICAL check")
+
+	check.cmd_args = []string{test_check, "0"}
+	check.test(t, expect_out, 0, "OK check")
+
+	check.cmd_args = []string{test_check, "15"}
+	check.test(t, expect_out, 3, "bad exit code")
+
+	// Testing attempts/retries logic
+	check.cmd_args = []string{test_check, "2"}
+	check.Retries     = 3
+	check.Retry_every = 60
+	check.attempts    = 0
+
+	check.test(t, expect_out, 2, "1st attempt failure")
+	assert.Equal(t, 1, check.attempts, "check is now 1st attempt failure")
+	assert.Equal(t, check.started_at.Add(time.Duration(check.Retry_every) * time.Second), check.next_run,
+		"next_run for 1st attempt uses Retry interval")
+
+	check.test(t, expect_out, 2, "2nd attempt failure")
+	assert.Equal(t, 2, check.attempts, "check is now 2nd attempt failure")
+	assert.Equal(t, check.started_at.Add(time.Duration(check.Retry_every) * time.Second), check.next_run,
+		"next_run for 2nd attempt uses Retry interval")
+
+	check.test(t, expect_out, 2, "3rd attempt failure")
+	assert.Equal(t, 3, check.attempts, "check is now 3rd attempt failure")
+	assert.Equal(t, check.started_at.Add(time.Duration(check.Every) * time.Second), check.next_run,
+		"next_run for 3rd attempt uses normal interval")
+
+	check.test(t, expect_out, 2, "4th attempt failure")
+	assert.Equal(t, 4, check.attempts, "check is now 4th attempt failure")
+	assert.Equal(t, check.started_at.Add(time.Duration(check.Every) * time.Second), check.next_run,
+		"next_run for 4th attempt uses normal interval")
+
+	check.cmd_args = []string{test_check, "0"}
+	check.test(t, expect_out, 0, "5th attempt recovery")
+	assert.Equal(t, 0, check.attempts, "check is rest to 0 attempts on recovery")
+	assert.Equal(t, check.started_at.Add(time.Duration(check.Every) * time.Second), check.next_run,
+		"next_run uses normal interval after recovery")
+
+	check.cmd_args = []string{test_check, "2"}
+
+	check.test(t, expect_out, 2, "1st attempt failure")
+	assert.Equal(t, 1, check.attempts, "check is now 1st attempt failure")
+	assert.Equal(t, check.started_at.Add(time.Duration(check.Retry_every) * time.Second), check.next_run,
+		"next_run for 1st attempt uses Retry interval")
+
+	check.cmd_args = []string{test_check, "0"}
+	check.test(t, expect_out, 0, "recovery before max attempts")
+	assert.Equal(t, 0, check.attempts,
+		"check is rest to 0 attempts on recovery, despite not hitting max attempts")
+	assert.Equal(t, check.started_at.Add(time.Duration(check.Every) * time.Second), check.next_run,
+		"next_run uses normal interval after recovery, depite not hitting max attempts")
+
+	// Run_as testing
+	if (whoami.Uid == "0") {
+		check.Run_as = "nobody"
+		check.test(t, "VAR1 is set\nRunning as 'nobody'\n", 0, "run_as nobody")
+	}
+}
+
+func Test_Submit(t *testing.T) {
+	check := Check{
+		Name:     "test_check",
+		Bulk:     "true",
+		Report:   "true",
+		output:   "myoutput\n",
+		err_msg:  "myerror\nsecondline",
+		rc:       0,
+		duration: time.Duration(42 * time.Second),
+		latency:  time.Duration(24 * time.Millisecond),
+	}
+	cfg = &Config{
+		Host:            "test01.example.com",
+	}
+
+	check.Submit(false)
+	expect := regexp.MustCompile(fmt.Sprintf("STATE \\d+ test01.example.com:bmad:test_check 0 %s",
+		"test_check completed successfully!"))
+	assert.Regexp(t, expect, check.output, "bulk + report returns state")
+
+	check.rc = 2
+	check.output = "myoutput\n"
+	check.Submit(false)
+	expect = regexp.MustCompile(fmt.Sprintf("STATE \\d+ test01.example.com:bmad:test_check 2 %s",
+		"myerror secondline"))
+	assert.Regexp(t, expect, check.output, "bulk + report with non-ok state gets stderr")
+
+	check.Report = "false"; check.Bulk = "true"
+	check.output = "myoutput\n"
+	check.Submit(false)
+	expect = regexp.MustCompile("STATE")
+	assert.NotRegexp(t, expect, check.output, "bulk + noreport doesn't do state")
+
+	check.Report = "true"; check.Bulk = "false"
+	check.output = "myoutput\n"
+	check.Submit(false)
+	assert.NotRegexp(t, expect, check.output, "nobulk + report doesn't do state")
+
+	check.output = "myoutput\n"
+	check.Submit(true)
+	expect = regexp.MustCompile("COUNTER \\d+ test01.example.com:bmad:checks")
+	assert.Regexp(t, expect, check.output, "bmad check counter meta-stat is reported")
+	expect = regexp.MustCompile("SAMPLE \\d+ test01.example.com:bmad:latency 0.0240")
+	assert.Regexp(t, expect, check.output, "bmad latency meta-stat is reported")
+
+	check.output = "myoutput\n"
+	check.Submit(false)
+	expect = regexp.MustCompile("COUNTER \\d+ test01.example.com:bmad:checks")
+	assert.NotRegexp(t, expect, check.output, "bmad check counter meta-stat is reported")
+	expect = regexp.MustCompile("SAMPLE \\d+ test01.example.com:bmad:latency 0.0240")
+	assert.NotRegexp(t, expect, check.output, "bmad latency meta-stat is reported")
+
+	expect = regexp.MustCompile("^myoutput")
+	assert.Regexp(t, expect, check.output, "normal check output is still present")
+	expect = regexp.MustCompile("SAMPLE \\d+ test01.example.com:bmad:exec-time 42.0000")
+	assert.Regexp(t, expect, check.output, "bmad exec time meta-stat is reported")
+	expect = regexp.MustCompile("SAMPLE \\d+ test01.example.com:bmad:test_check:exec-time 42.000")
+	assert.Regexp(t, expect, check.output, "bmad check exec time meta-stat is reported")
+
+	r, w, err := os.Pipe()
+	writer = w
+	defer func () { writer = nil }()
+
+	check.output = "myoutput\n"
+	check.Submit(true)
+	var buffer []byte
+	buffer = make([]byte, len(check.output))
+	n, err := r.Read(buffer)
+	assert.NoError(t, err, "No errors from reading output")
+	assert.Equal(t, len(check.output), n, "Read entire output")
+	assert.Equal(t, []byte(check.output), buffer, "check output gets set to bolo")
+}
+
+func Test_Output(t *testing.T) {
+	check := Check{
+		output: "this is my output\nline two.",
+	}
+
+	assert.Equal(t, "this is my output\nline two.", check.Output(), "check.Output() returns check output")
 }

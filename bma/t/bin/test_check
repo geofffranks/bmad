@@ -1,0 +1,19 @@
+#!/bin/bash
+
+function nothing {
+	i=0
+}
+
+echo "VAR1 $VAR1"
+echo "Running as '$(whoami)'"
+
+if [[ "$1" == "hang" ]]; then
+	shift
+	trap nothing SIGTERM SIGINT SIGHUP
+	i=0
+	while [[ $i  -lt 15 ]]; do
+		sleep 1
+		i=`expr $i + 1`
+	done
+fi
+exit $1

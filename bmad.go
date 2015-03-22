@@ -211,18 +211,18 @@ func run_once(check *bma.Check) () {
 	if err := check.Spawn(); err != nil {
 		fmt.Printf("Error executing %s: %s", check.Name, err.Error())
 	}
-	output, complete := check.Reap();
+	complete := check.Reap();
 	for !complete {
 		time.Sleep(TICK)
-		output, complete = check.Reap();
+		complete = check.Reap();
 	}
 	fmt.Printf("Results:\n")
-	for _, line := range(strings.Split(output, "\n")) {
+	for _, line := range(strings.Split(check.Output(), "\n")) {
 		fmt.Printf("	%s\n", line)
 	}
 	if getopt.GetValue("noop") != "true" {
 		fmt.Printf("Sending results to bolo...")
-		if err := bma.SendToBolo(output); err != nil {
+		if err := check.Submit(false); err != nil {
 			fmt.Printf("Error submitting results: %s\n", err.Error)
 		} else {
 			fmt.Printf("Ok\n")
@@ -290,14 +290,13 @@ func run_loop() () {
 
 		var still_running [](*bma.Check)
 		for _, check := range in_flight {
-			if output, complete := check.Reap(); !complete {
+			if complete := check.Reap(); !complete {
 				still_running = append(still_running, check)
 			} else {
 				log.Debug("%s reaped successfully", check.Name)
-				bma.SendToBolo(output)
-//				if err := bma.SendToBolo(output); err != nil {
-//					log.Error("Error submitting check results for %s: %s", check.Name, err.Error())
-//				}
+				if err := check.Submit(true); err != nil {
+					log.Error("Error submitting check results for %s: %s", check.Name, err.Error())
+				}
 			}
 		}
 		in_flight = still_running
