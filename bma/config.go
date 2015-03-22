@@ -36,7 +36,6 @@ type Config struct {
 	Host        string                // Hostname that bmad is running on
 	Include_dir string                // Directory to include *.conf files from
 }
-//FIXME: test config reloading + merging of schedule data
 
 func default_config() (*Config) {
 	var cfg Config

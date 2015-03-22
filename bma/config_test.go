@@ -172,7 +172,6 @@ func TestLoadConfig(t *testing.T) {
 
 	got, err = LoadConfig("t/data/reloaded.yml")
 	assert.Equal(t, expect, got, "LoadConfig('t/data/reloaded.yml') updates config properly on reload")
-	//FIXME: respawn send2bolo testing
 }
 
 func Test_initialize_check(t *testing.T) {
