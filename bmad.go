@@ -178,8 +178,11 @@ func main() {
 	}
 
 	log.Notice("bmad starting up")
-	bma.ConnectToBolo()
-	//FIXME: tests galore
+	err = bma.ConnectToBolo()
+	if err != nil {
+		log.Error("Couldn't spawn send_bolo: %s", err.Error())
+		panic(fmt.Sprintf("Couldn't spawn send_bolo: %s", err.Error()))
+	}
 
 	if getopt.GetValue("test") == "true" {
 		var ran int
@@ -269,7 +272,14 @@ func run_loop() () {
 				log.Error("Couldn't reload config: %s", err.Error())
 			}
 			CFG_RELOAD = false
-			//FIXME: respawn send_bolo
+			time.Sleep(250 * time.Millisecond) // make sure any buffers get read/sent/cleared for send_bolo
+			bma.DisconnectFromBolo()
+			err = bma.ConnectToBolo()
+			if err != nil {
+				log.Error("Couldn't spawn send_bolo: %s", err.Error())
+				panic(fmt.Sprintf("Couldn't spawn send_bolo: %s", err.Error()))
+			}
+
 		}
 		if CFG_DUMP {
 			log.Info("Configuration dump requested")

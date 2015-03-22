@@ -55,6 +55,7 @@ func DisconnectFromBolo() {
 	if err:= syscall.Kill(pid, syscall.SIGTERM); err != nil {
 		log.Debug("send_bolo[%d] already terminated", pid)
 	}
+	send2bolo = nil
 }
 
 // Sends an individual message from check output to bolo,
