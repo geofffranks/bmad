@@ -176,7 +176,6 @@ func (self *Check) Spawn() (error) {
 func (self *Check) Reap() (bool) {
 	pid := self.process.Process.Pid
 
-	//FIXME:  verify large buffer output doesn't cause deadlocking
 	var ws syscall.WaitStatus
 	status, err := syscall.Wait4(pid, &ws, syscall.WNOHANG, nil);
 	if err != nil {

@@ -1,14 +1,15 @@
 package bma
 
 import "testing"
+import "github.com/stretchr/testify/assert"
+import "bytes"
 import "fmt"
 import "os"
 import "os/exec"
 import "os/user"
-import "github.com/stretchr/testify/assert"
 import "regexp"
+import "strings"
 import "time"
-import "bytes"
 
 
 func Test_merge_checks(t *testing.T) {
@@ -134,12 +135,33 @@ func (check *Check) test(t *testing.T, expect_out string, expect_rc int, message
 			break;
 		}
 		time.Sleep(100 * time.Millisecond)
+		assert.Equal(t, "", check.output, "%s: check has no output yet")
 	}
 	assert.True(t,  finished, "%s: check finished", message)
 	assert.Equal(t, expect_out, check.output, "%s: check output was as expected", message)
 	assert.Equal(t, expect_rc,  check.rc,     "%s: check rc was as expected", message)
 	assert.False(t, check.running, "%s: check is no longer running", message)
 
+}
+
+func Test_large_output(t *testing.T) {
+	pwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Couldn't get working directory of tests: %s", err.Error())
+	}
+	cfg = &Config{
+		Host: "test01.example.com",
+	}
+	check := Check{
+		cmd_args: []string{pwd + "/t/bin/test_large_output"},
+		Env:      map[string]string{"VAR1": "is set"},
+		Name:     "test_large_output",
+		Every:    300,
+		Timeout:  1,
+	}
+
+	expect_out := strings.Repeat(strings.Repeat(".", 8193) + "done\n", 10)
+	check.test(t, expect_out, 0, "large output succeeds without deadlocking")
 }
 
 func Test_check_lifecycle(t *testing.T) {

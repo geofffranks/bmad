@@ -1,0 +1,9 @@
+#!/bin/bash
+
+for i in {1..10}; do
+	for i in {1..8193}; do
+		echo -n .
+	done
+	echo "done"
+done
+exit 0
