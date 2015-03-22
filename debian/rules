@@ -4,6 +4,8 @@ export DH_OPTIONS
 
 export DH_GOPKG := github.com/geofffranks/bmad
 export GO_ROOT := /usr/share/gocode/
+export DH_GOLANG_INSTALL_ALL := 1
+
 %:
 	dh $@ --buildsystem=golang --with=golang
 
