@@ -116,6 +116,7 @@ func (check *Check) test(t *testing.T, expect_out string, expect_rc int, message
 	if message == "" {
 		message = "test_check"
 	}
+	os.Chmod(check.cmd_args[0], 0755)
 	err := check.Spawn()
 	if ! assert.True(t, check.running, "%s: check.running is true post-spawn", message) {
 		t.Fatalf("Couldn't spawn check, bailing out: %s", err.Error())

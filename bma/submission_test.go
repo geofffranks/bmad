@@ -48,8 +48,14 @@ func Test_LifeOfBolo(t *testing.T) {
 	_, err = os.Stat("t/tmp/bolo.out");
 	assert.True(t, os.IsNotExist(err), "bolo.out temp file is gone, test can start")
 
-	cfg.Send_bolo = "t/bin/send_bolo"
+	pwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Couldn't get working directory of tests: %s", err.Error())
+	}
+	cfg.Send_bolo = pwd + "/t/bin/send_bolo"
+	os.Chmod(cfg.Send_bolo, 0755)
 	err = ConnectToBolo()
+	assert.NoError(t, err, "No error connecting to bolo")
 	assert.NotNil(t, writer, "We have a writer!")
 	assert.NotNil(t, send2bolo, "We have send2bolo!")
 	assert.True(t, send2bolo.Process.Pid > 1, "send2bolo has a pid")
