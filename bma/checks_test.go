@@ -274,62 +274,84 @@ func Test_Submit(t *testing.T) {
 		Host:            "test01.example.com",
 	}
 
-	check.Submit(false)
+	output := check.test_submission(t, false, 1024)
 	expect := regexp.MustCompile(fmt.Sprintf("STATE \\d+ test01.example.com:bmad:test_check 0 %s",
 		"test_check completed successfully!"))
-	assert.Regexp(t, expect, check.output, "bulk + report returns state")
+	assert.Regexp(t, expect, output, "bulk + report returns state")
 
 	check.rc = 2
-	check.output = "myoutput\n"
-	check.Submit(false)
+	output = check.test_submission(t, false, 1024)
 	expect = regexp.MustCompile(fmt.Sprintf("STATE \\d+ test01.example.com:bmad:test_check 2 %s",
 		"myerror secondline"))
-	assert.Regexp(t, expect, check.output, "bulk + report with non-ok state gets stderr")
+	assert.Regexp(t, expect, output, "bulk + report with non-ok state gets stderr")
 
 	check.Report = "false"; check.Bulk = "true"
-	check.output = "myoutput\n"
-	check.Submit(false)
+	output = check.test_submission(t, false, 1024)
 	expect = regexp.MustCompile("STATE")
-	assert.NotRegexp(t, expect, check.output, "bulk + noreport doesn't do state")
+	assert.NotRegexp(t, expect, output, "bulk + noreport doesn't do state")
 
 	check.Report = "true"; check.Bulk = "false"
-	check.output = "myoutput\n"
-	check.Submit(false)
-	assert.NotRegexp(t, expect, check.output, "nobulk + report doesn't do state")
+	output = check.test_submission(t, false, 1024)
+	assert.NotRegexp(t, expect, output, "nobulk + report doesn't do state")
 
-	check.output = "myoutput\n"
-	check.Submit(true)
-	expect = regexp.MustCompile("COUNTER \\d+ test01.example.com:bmad:checks")
-	assert.Regexp(t, expect, check.output, "bmad check counter meta-stat is reported")
-	expect = regexp.MustCompile("SAMPLE \\d+ test01.example.com:bmad:latency 0.0240")
-	assert.Regexp(t, expect, check.output, "bmad latency meta-stat is reported")
-
-	check.output = "myoutput\n"
-	check.Submit(false)
-	expect = regexp.MustCompile("COUNTER \\d+ test01.example.com:bmad:checks")
-	assert.NotRegexp(t, expect, check.output, "bmad check counter meta-stat is reported")
-	expect = regexp.MustCompile("SAMPLE \\d+ test01.example.com:bmad:latency 0.0240")
-	assert.NotRegexp(t, expect, check.output, "bmad latency meta-stat is reported")
-
+	output = check.test_submission(t, true, 1024)
 	expect = regexp.MustCompile("^myoutput")
-	assert.Regexp(t, expect, check.output, "normal check output is still present")
+	assert.Regexp(t, expect, output, "normal check output is still present")
+	expect = regexp.MustCompile("COUNTER \\d+ test01.example.com:bmad:checks")
+	assert.Regexp(t, expect, output, "bmad check counter meta-stat is reported")
+	expect = regexp.MustCompile("SAMPLE \\d+ test01.example.com:bmad:latency 0.0240")
+	assert.Regexp(t, expect, output, "bmad latency meta-stat is reported")
 	expect = regexp.MustCompile("SAMPLE \\d+ test01.example.com:bmad:exec-time 42.0000")
-	assert.Regexp(t, expect, check.output, "bmad exec time meta-stat is reported")
+	assert.Regexp(t, expect, output, "bmad exec time meta-stat is reported")
 	expect = regexp.MustCompile("SAMPLE \\d+ test01.example.com:bmad:test_check:exec-time 42.000")
-	assert.Regexp(t, expect, check.output, "bmad check exec time meta-stat is reported")
+	assert.Regexp(t, expect, output, "bmad check exec time meta-stat is reported")
 
+	output = check.test_submission(t, false, 1024)
+	expect = regexp.MustCompile("^myoutput")
+	assert.Regexp(t, expect, output, "normal check output is still present")
+	expect = regexp.MustCompile("SAMPLE \\d+ test01.example.com:bmad:exec-time 42.0000")
+	assert.Regexp(t, expect, output, "bmad exec time meta-stat is reported")
+	expect = regexp.MustCompile("SAMPLE \\d+ test01.example.com:bmad:test_check:exec-time 42.000")
+	assert.Regexp(t, expect, output, "bmad check exec time meta-stat is reported")
+	expect = regexp.MustCompile("COUNTER \\d+ test01.example.com:bmad:checks")
+	assert.NotRegexp(t, expect, output, "bmad check counter meta-stat is not reported")
+	expect = regexp.MustCompile("SAMPLE \\d+ test01.example.com:bmad:latency 0.0240")
+	assert.NotRegexp(t, expect, output, "bmad latency meta-stat is not reported")
+
+	check.Bulk     = "true"
+	check.attempts = 1
+	check.Retries  = 3
+	output = check.test_submission(t, false, 1024)
+	expect = regexp.MustCompile("^myoutput")
+	assert.Regexp(t, expect, output, "Bulk check with fewer attempts than retries submits status")
+
+	check.Bulk = "false"
+	output = check.test_submission(t, false, 1024)
+	expect = regexp.MustCompile("^myoutput")
+	assert.NotRegexp(t, expect, output, "Non-bulk check with fewer attempts than retries doesn't submit status")
+	expect = regexp.MustCompile("SAMPLE \\d+ test01.example.com:bmad:exec-time 42.0000")
+	assert.Regexp(t, expect, output, "meta-stats are reported despite attempts less than max retries")
+
+	check.attempts = 3
+	output = check.test_submission(t, false, 1024)
+	expect = regexp.MustCompile("^myoutput")
+	assert.Regexp(t, expect, output, "Non-bulk check with more attempts than retries submits status")
+}
+
+func (check *Check) test_submission(t *testing.T, full_stats bool, buf_len int) (string) {
+	if buf_len == 0 {
+		buf_len = 1024
+	}
 	r, w, err := os.Pipe()
 	writer = w
 	defer func () { writer = nil }()
 
-	check.output = "myoutput\n"
-	check.Submit(true)
+	check.Submit(full_stats)
 	var buffer []byte
-	buffer = make([]byte, len(check.output))
+	buffer = make([]byte, buf_len)
 	n, err := r.Read(buffer)
-	assert.NoError(t, err, "No errors from reading output")
-	assert.Equal(t, len(check.output), n, "Read entire output")
-	assert.Equal(t, []byte(check.output), buffer, "check output gets set to bolo")
+	assert.NoError(t, err, "No errors reading output")
+	return string(buffer[0:n])
 }
 
 func Test_Output(t *testing.T) {

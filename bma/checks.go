@@ -245,8 +245,8 @@ func (self *Check) Reap() (bool) {
 }
 
 func (self *Check) Submit(full_stats bool) (error) {
-	//FIXME: figure out what to do about attempts/retries
 	// Add meta-stats for bmad
+	var meta string
 	var msg string
 	if (self.Bulk == "true" && self.Report == "true") {
 		// check-specific state (for bulk data-submitter checks)
@@ -255,28 +255,34 @@ func (self *Check) Submit(full_stats bool) (error) {
 		} else {
 			msg = strings.Replace(self.err_msg, "\n", " ", -1)
 		}
-		self.output = self.output + fmt.Sprintf("\nSTATE %d %s:bmad:%s %d %s",
+		meta = fmt.Sprintf("STATE %d %s:bmad:%s %d %s",
 			time.Now().Unix(), cfg.Host, self.Name, self.rc, msg)
 	}
 	// check-specific runtime
-	self.output = self.output + fmt.Sprintf("\nSAMPLE %d %s:bmad:%s:exec-time %0.4f",
-		time.Now().Unix(), cfg.Host, self.Name, self.duration.Seconds())
+	meta = fmt.Sprintf("%s\nSAMPLE %d %s:bmad:%s:exec-time %0.4f",
+		meta, time.Now().Unix(), cfg.Host, self.Name, self.duration.Seconds())
 	// bmad avg check runtime
-	self.output = self.output + fmt.Sprintf("\nSAMPLE %d %s:bmad:exec-time %0.4f",
-		time.Now().Unix(), cfg.Host, self.duration.Seconds())
+	meta = fmt.Sprintf("%s\nSAMPLE %d %s:bmad:exec-time %0.4f",
+		meta, time.Now().Unix(), cfg.Host, self.duration.Seconds())
 
 	if full_stats {
 		// bmad avg check latency
-		self.output = self.output + fmt.Sprintf("\nSAMPLE %d %s:bmad:latency %0.4f",
-			time.Now().Unix(), cfg.Host, self.latency.Seconds())
+		meta = fmt.Sprintf("%s\nSAMPLE %d %s:bmad:latency %0.4f",
+			meta, time.Now().Unix(), cfg.Host, self.latency.Seconds())
 		// bmad overall check throughput measurement
-		self.output = self.output + fmt.Sprintf("\nCOUNTER %d %s:bmad:checks",
-			time.Now().Unix(), cfg.Host)
+		meta = fmt.Sprintf("%s\nCOUNTER %d %s:bmad:checks",
+			meta, time.Now().Unix(), cfg.Host)
 	}
 
-	self.output = self.output + "\n"
+	meta = meta + "\n"
 	log.Debug("%s output: %s", self.Name, self.output)
-	err := SendToBolo(self.output)
+	var err error
+	if self.Bulk == "true" || self.attempts >= self.Retries{
+		err = SendToBolo(fmt.Sprintf("%s\n%s", self.output, meta))
+	} else {
+		log.Debug("%s not yet at max attempts, suppressing output submission", self.Name)
+		err = SendToBolo(meta)
+	}
 	if err != nil {
 		return err
 	}
