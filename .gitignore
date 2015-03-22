@@ -3,3 +3,4 @@ doc/
 *.pprof
 bmad
 bma/t/tmp
+*.swp
