@@ -9,6 +9,13 @@ export DH_GOLANG_INSTALL_ALL := 1
 %:
 	dh $@ --buildsystem=golang --with=golang
 
+override_dh_auto_configure:
+	dh_auto_configure -O--buildsystem=golang
+	rm -rf $(CURDIR)/obj-x86_64-linux-gnu/src/github.com/geofffranks/bmad/.git
+	rm -rf $(CURDIR)/obj-x86_64-linux-gnu/src/github.com/geofffranks/bmad/.gitignore
+	rm -rf $(CURDIR)/obj-x86_64-linux-gnu/src/github.com/geofffranks/bmad/LICENSE
+
+
 override_dh_install:
 	dh_install -O--buildsystem=golang
 	make docs
