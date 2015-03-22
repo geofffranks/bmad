@@ -157,7 +157,7 @@ func Test_large_output(t *testing.T) {
 		Env:      map[string]string{"VAR1": "is set"},
 		Name:     "test_large_output",
 		Every:    300,
-		Timeout:  1,
+		Timeout:  20,
 	}
 
 	expect_out := strings.Repeat(strings.Repeat(".", 8193) + "done\n", 10)

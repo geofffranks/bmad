@@ -12,8 +12,8 @@ Build-Depends: debhelper (>= 8),
                golang-mangodoc,
                golang-profile-dev,
                golang-shellwords-dev,
-               golang-stretcher-objx-dev,
-               golang-stretchertestify-dev,
+               golang-stretchr-objx-dev,
+               golang-stretchr-testify-dev,
                golang-go
 
 Package: bmad
