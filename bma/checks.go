@@ -243,6 +243,16 @@ func (self *Check) Reap() (bool) {
 	return true
 }
 
+// Submits check results to bolo. This will append meta-stats
+// to the checks as well, for bmad (like checks run, execution
+// time, check latency). If the check has Bulk and Report both set
+// to "true", it will report a STATE for the bulk check's execution.
+// If the bulk check failed, any output to stderr will be included
+// in the status message.
+//
+// If full_stats is set to false, the latency, and count of checks run
+// will *NOT* be reported. This is primarily used internally
+// for reporting stats differently for run-once mode vs daemonized.
 func (self *Check) Submit(full_stats bool) (error) {
 	// Add meta-stats for bmad
 	var meta string
@@ -293,6 +303,7 @@ func (self *Check) ShouldRun() (bool) {
 	return ! self.running && time.Now().After(self.next_run)
 }
 
+// Returns the last output of a check
 func (self *Check) Output() (string) {
 	return self.output
 }

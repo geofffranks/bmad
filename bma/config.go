@@ -37,6 +37,7 @@ type Config struct {
 	Include_dir string                // Directory to include *.conf files from
 }
 
+// Returns a default config for bmad
 func default_config() (*Config) {
 	var cfg Config
 	cfg.Every       = 300
@@ -52,17 +53,20 @@ func default_config() (*Config) {
 	return &cfg
 }
 
+// Function-variable for returning the hostname (used for mocking during tests)
 var os_hostname = func() (string, error) {
 	return os.Hostname()
 }
+// Function-variable for returning IP Addrs for a hostname (used for mocking during tests)
 var net_lookuphost = func(h string) ([]string, error) {
 	return net.LookupHost(h)
 }
+// Function-variable for returning the hostname given an IP Addr (used for mocking during tests)
 var net_lookupaddr = func(a string) ([]string, error) {
 	return net.LookupAddr(a)
 }
 
-// Performes heuristics to determine the hostname of the current host.
+// Performs heuristics to determine the hostname of the current host.
 // Tries os.Hostname(), and if that isn't fully qualified (contains a '.'),
 // Fails over to finding the first hostname for the first IP of the host
 // that contains a '.'. If none do, fails back to the unqualified hostname.
@@ -166,10 +170,14 @@ func LoadConfig(cfg_file string) (*Config, error) {
 	return cfg, nil
 }
 
+// Function-variable to perform initial scheduling of a check, upon config generation.
 var first_run = func (interval int64) (time.Time) {
 	return time.Now().Add(time.Duration(rand.Int63n(interval * int64(time.Second))))
 }
 
+// Takes a new check, and initializes it based on global config defaults, and
+// hard-coded safeguards, to ensure checks don't run *too* frequently, or get
+// configured in a messed up way (like setting Timeout above Every, or to 0)
 func initialize_check(name string, check *Check, defaults *Config) (error) {
 	if check.Name == "" {
 		check.Name = name
