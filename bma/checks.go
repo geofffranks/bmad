@@ -120,6 +120,12 @@ func (self *Check) Spawn() (error) {
 	self.output  = ""
 	self.err_msg = ""
 
+	// Reset started_at as soon as possible after determining there isn't
+	// a check already running. This way, if there are errors we can
+	// back-off rescheduling, rather than try every tick, for relatively
+	// long-term fixes (user creation, file creation/renames/permissions)
+	self.started_at  = time.Now()
+
 	if self.Run_as != "" {
 		u, err := user.Lookup(self.Run_as)
 		if err != nil {
@@ -144,15 +150,14 @@ func (self *Check) Spawn() (error) {
 	}
 	log.Debug("Spawned check %s[%d]", self.Name, process.Process.Pid)
 
-	self.started_at  = time.Now()
-	self.ended_at    = time.Time{}
 	self.running     = true
-	self.duration    = 0
 	self.process     = process
-	self.sig_term    = false
-	self.sig_kill    = false
 	self.stdout      = &o
 	self.stderr      = &e
+	self.sig_term    = false
+	self.sig_kill    = false
+	self.ended_at    = time.Time{}
+	self.duration    = 0
 
 	return nil
 }
@@ -220,17 +225,7 @@ func (self *Check) Reap() (bool) {
 		self.rc = UNKNOWN
 	}
 
-	self.schedule(self.started_at, self.Every)
-	if self.Bulk != "true" {
-		if self.rc != OK {
-			self.attempts++
-			if self.attempts < self.Retries {
-				self.schedule(self.started_at, self.Retry_every)
-			}
-		} else {
-			self.attempts = 0
-		}
-	}
+	self.reschedule()
 
 	if self.ended_at.After(self.next_run) {
 		timeout_triggered := "not reached"
@@ -286,7 +281,7 @@ func (self *Check) Submit(full_stats bool) (error) {
 	meta = meta + "\n"
 	log.Debug("%s output: %s", self.Name, self.output)
 	var err error
-	if self.Bulk == "true" || self.attempts >= self.Retries{
+	if self.Bulk == "true" || self.attempts >= self.Retries {
 		err = SendToBolo(fmt.Sprintf("%s\n%s", self.output, meta))
 	} else {
 		log.Debug("%s not yet at max attempts, suppressing output submission", self.Name)
@@ -298,6 +293,21 @@ func (self *Check) Submit(full_stats bool) (error) {
 	return nil
 }
 
+func (self *Check) Fail(failure error) (error) {
+	log.Error("Error running check \"%s\": %s", self.Name, failure.Error())
+	var err error
+	self.rc = 3
+	self.reschedule()
+	if (self.Report == "true") {
+		if (self.Bulk == "true" || self.attempts >= self.Retries) {
+			msg := fmt.Sprintf("STATE %d %s:bmad:%s %d %s",
+				time.Now().Unix(), cfg.Host, self.Name, self.rc, "failed to exec: " + failure.Error())
+			err = SendToBolo(msg)
+		}
+	}
+	return err
+}
+
 // Determines whether or not a Check should be run
 func (self *Check) ShouldRun() (bool) {
 	return ! self.running && time.Now().After(self.next_run)
@@ -306,4 +316,18 @@ func (self *Check) ShouldRun() (bool) {
 // Returns the last output of a check
 func (self *Check) Output() (string) {
 	return self.output
+}
+
+func (self *Check) reschedule() {
+	self.schedule(self.started_at, self.Every)
+	if self.Bulk != "true" {
+		if self.rc != OK {
+			self.attempts++
+			if self.attempts < self.Retries {
+				self.schedule(self.started_at, self.Retry_every)
+			}
+		} else {
+			self.attempts = 0
+		}
+	}
 }

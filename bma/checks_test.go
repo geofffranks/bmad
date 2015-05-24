@@ -3,6 +3,7 @@ package bma
 import "testing"
 import "github.com/stretchr/testify/assert"
 import "bytes"
+import "errors"
 import "fmt"
 import "os"
 import "os/exec"
@@ -374,6 +375,63 @@ func (check *Check) test_submission(t *testing.T, full_stats bool, buf_len int) 
 	buffer = make([]byte, buf_len)
 	n, err := r.Read(buffer)
 	assert.NoError(t, err, "No errors reading output")
+	return string(buffer[0:n])
+}
+
+func Test_Fail(t *testing.T) {
+	check := Check{
+		Name:     "test_check",
+		Bulk:     "true",
+		Report:   "true",
+		rc:       0,
+		duration: time.Duration(42 * time.Second),
+		latency:  time.Duration(24 * time.Millisecond),
+	}
+	mockErr := errors.New("No such file or directory")
+
+	output := check.test_failure(t, mockErr, 1024)
+	expect := regexp.MustCompile(fmt.Sprintf("STATE \\d+ test01.example.com:bmad:test_check 3 %s",
+		"failed to exec: No such file or directory"))
+	assert.Regexp(t, expect, output, "failure reports state properly")
+	assert.Equal(t, 0, check.attempts, "attempts is still set to 0")
+	assert.Equal(t, 3, check.rc, "check is in an unknown state")
+
+	check.Bulk = "false"
+	check.Retries = 2
+	check.rc = 0
+	output = check.test_failure(t, mockErr, 1024)
+	assert.Equal(t, 1, check.attempts, "attempts incremented after failure of non-bulk check")
+	assert.Equal(t, 3, check.rc, "check is in an unknown state")
+	assert.Equal(t, "\nEOF", output, "no output from the check... yet")
+	output = check.test_failure(t, mockErr, 1024)
+	assert.Regexp(t, expect, output, "check outputs failure finally")
+	assert.Equal(t, 3, check.rc, "check is in an unknown state")
+	assert.Equal(t, 2, check.attempts, "check attempts incremented again")
+
+	check.Report = "false"
+	check.rc = 0
+	check.attempts = 0
+	check.Retries = 0
+	output = check.test_failure(t, mockErr, 1024)
+	assert.Equal(t, "\nEOF", output, "no output when Report is turned off for the check")
+	assert.Equal(t, 3, check.rc, "check is unknown again")
+	assert.Equal(t, 1, check.attempts, "check attempts 1 after rescheduling despite not reporting")
+}
+
+func (check *Check) test_failure(t *testing.T, e error, buf_len int) (string) {
+	if buf_len == 0 {
+		buf_len = 1024
+	}
+	r, w, err := os.Pipe()
+	writer = w
+	defer func () { writer = nil }()
+
+	check.Fail(e)
+	writer.Write([]byte("\nEOF"))
+	var buffer []byte
+	buffer = make([]byte, buf_len)
+	n, err := r.Read(buffer)
+	assert.NoError(t, err, "no errors reading output")
 	return string(buffer[0:n])
 }
 

@@ -291,7 +291,9 @@ func run_loop() () {
 			if check.ShouldRun() {
 				log.Debug("Spawning check \"%s\"", check.Name)
 				if err := check.Spawn(); err != nil {
-					log.Error("Error spawning check \"%s\": %s", check.Name, err.Error())
+					if err := check.Fail(err); err != nil {
+						log.Error("Error submitting failure message for %s: %s", check.Name, err.Error())
+					}
 					continue
 				}
 				in_flight = append(in_flight, check)
