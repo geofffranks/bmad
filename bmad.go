@@ -135,6 +135,7 @@ import "fmt"
 import "os"
 import "os/signal"
 import "regexp"
+import "runtime"
 import "strings"
 import "syscall"
 import "time"
@@ -144,6 +145,11 @@ const TICK time.Duration = 100 * time.Millisecond
 var cfg *bma.Config
 
 func main() {
+	// goroutines != threads. They're concurrent tasks inside of the go schedule
+	// Unless you adjust GOMAXPROCS, you will default to 1 CPU/1 thread, so only
+	// one goroutine can run at atime, leading to non-concurrent check running
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	getopt.StringLong(  "config",       'c', "/etc/bmad.conf", "specifies alternative config file.", "/etc/bmad.conf")
 	getopt.BoolLong(    "test",         't',                   "ignore scheduling, and execute one run of all matching checks sequentially")
 	getopt.StringLong(  "match"  ,      'm', ".",              "regex for filtering checks for --test mode")
