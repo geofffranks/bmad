@@ -5,7 +5,7 @@ package bma
 
 import "errors"
 import "fmt"
-import "github.com/geofffranks/bmad/log"
+import "github.com/starkandwayne/goutils/log"
 import "launchpad.net/goyaml"
 import "io/ioutil"
 import "math/rand"
@@ -23,31 +23,31 @@ const MIN_INTERVAL int64 = 10
 // Config objects represent the internal bmad configuration,
 // after being loaded from the YAML config file.
 type Config struct {
-	Send_bolo   string                // Command to use for spawning the send_bolo process, to submit Check results
-	Every       int64                 // Global default interval to run Checks (in seconds)
-	Retry_every int64                 // Global default interval to retry failed Checks (in seconds)
-	Retries     int                   // Global default number of times to retry a failed Check
-	Timeout     int64                 // Global default timeout for maximum check execution time (in seconds)
-	Bulk        string                // Global default for is this a bulk-mode check
-	Report      string                // Global default for should a bulk check report its STATE
-	Checks      map[string]*Check     // Map describing all Checks to be executed via bmad, keyed by Check name
-	Env         map[string]string     // Global default environment variables to apply to all Checks run
-	Log         log.LogConfig         // Configuration for the bmad logger
-	Host        string                // Hostname that bmad is running on
-	Include_dir string                // Directory to include *.conf files from
+	Send_bolo   string            // Command to use for spawning the send_bolo process, to submit Check results
+	Every       int64             // Global default interval to run Checks (in seconds)
+	Retry_every int64             // Global default interval to retry failed Checks (in seconds)
+	Retries     int               // Global default number of times to retry a failed Check
+	Timeout     int64             // Global default timeout for maximum check execution time (in seconds)
+	Bulk        string            // Global default for is this a bulk-mode check
+	Report      string            // Global default for should a bulk check report its STATE
+	Checks      map[string]*Check // Map describing all Checks to be executed via bmad, keyed by Check name
+	Env         map[string]string // Global default environment variables to apply to all Checks run
+	Log         log.LogConfig     // Configuration for the bmad logger
+	Host        string            // Hostname that bmad is running on
+	Include_dir string            // Directory to include *.conf files from
 }
 
 // Returns a default config for bmad
-func default_config() (*Config) {
+func default_config() *Config {
 	var cfg Config
-	cfg.Every       = 300
+	cfg.Every = 300
 	cfg.Retry_every = 60
-	cfg.Checks      = map[string]*Check{}
-	cfg.Retries     = 1
-	cfg.Timeout     = 45
-	cfg.Send_bolo   = "send_bolo -t stream"
-	cfg.Env         = map[string]string{}
-	cfg.Host        = hostname()
+	cfg.Checks = map[string]*Check{}
+	cfg.Retries = 1
+	cfg.Timeout = 45
+	cfg.Send_bolo = "send_bolo -t stream"
+	cfg.Env = map[string]string{}
+	cfg.Host = hostname()
 	cfg.Include_dir = "/etc/bmad.d"
 
 	return &cfg
@@ -57,10 +57,12 @@ func default_config() (*Config) {
 var os_hostname = func() (string, error) {
 	return os.Hostname()
 }
+
 // Function-variable for returning IP Addrs for a hostname (used for mocking during tests)
 var net_lookuphost = func(h string) ([]string, error) {
 	return net.LookupHost(h)
 }
+
 // Function-variable for returning the hostname given an IP Addr (used for mocking during tests)
 var net_lookupaddr = func(a string) ([]string, error) {
 	return net.LookupAddr(a)
@@ -70,10 +72,10 @@ var net_lookupaddr = func(a string) ([]string, error) {
 // Tries os.Hostname(), and if that isn't fully qualified (contains a '.'),
 // Fails over to finding the first hostname for the first IP of the host
 // that contains a '.'. If none do, fails back to the unqualified hostname.
-func hostname() (string) {
-	h, err  := os_hostname()
+func hostname() string {
+	h, err := os_hostname()
 	if err != nil {
-		log.Error("Couldn't get hostname for current host: %s", err.Error())
+		log.Errorf("Couldn't get hostname for current host: %s", err.Error())
 		return "unknown"
 	}
 	if strings.ContainsRune(h, '.') {
@@ -81,23 +83,23 @@ func hostname() (string) {
 	}
 	addrs, err := net_lookuphost(h)
 	if err != nil {
-		log.Warn("Couldn't resolve FQDN of host: %s", err.Error());
+		log.Warnf("Couldn't resolve FQDN of host: %s", err.Error())
 		return h
 	}
 	if len(addrs) > 0 {
 		names, err := net_lookupaddr(addrs[0])
 		if err != nil {
-			log.Warn("Couldn't resolve FQDN of host: %s", err.Error());
+			log.Warnf("Couldn't resolve FQDN of host: %s", err.Error())
 			return h
 		}
-		for _, name := range(names) {
+		for _, name := range names {
 			if strings.ContainsRune(name, '.') {
 				return name
 			}
 		}
 	}
 
-	log.Warn("No FQDN resolvable, defaulting to unqualified hostname")
+	log.Warnf("No FQDN resolvable, defaulting to unqualified hostname")
 	return h
 }
 
@@ -118,29 +120,29 @@ func LoadConfig(cfg_file string) (*Config, error) {
 	}
 
 	if new_cfg.Include_dir != "" {
-		log.Debug("Loading auxillary configs from %s", new_cfg.Include_dir)
+		log.Debugf("Loading auxillary configs from %s", new_cfg.Include_dir)
 		files, err := filepath.Glob(new_cfg.Include_dir + "/*.conf")
 		if err != nil {
-			log.Warn("Couldn't find include files: %s", err.Error())
+			log.Warnf("Couldn't find include files: %s", err.Error())
 		} else {
-			for _, file := range(files) {
-				log.Debug("Loading auxillary config: %s", file)
+			for _, file := range files {
+				log.Debugf("Loading auxillary config: %s", file)
 				source, err := ioutil.ReadFile(file)
 				if err != nil {
-					log.Warn("Couldn't read %q: %s", file, err.Error())
+					log.Warnf("Couldn't read %q: %s", file, err.Error())
 					continue
 				}
 
 				checks := map[string]*Check{}
 				err = goyaml.Unmarshal(source, &checks)
 				if err != nil {
-					log.Warn("Could not parse yaml from %q: %s", file, err.Error())
+					log.Warnf("Could not parse yaml from %q: %s", file, err.Error())
 					continue
 				}
 
-				for name, check := range(checks) {
+				for name, check := range checks {
 					if _, exists := new_cfg.Checks[name]; exists {
-						log.Warn("Check %q defined in multiple config files, ignoring definition in %s", name, file)
+						log.Warnf("Check %q defined in multiple config files, ignoring definition in %s", name, file)
 						continue
 					}
 					new_cfg.Checks[name] = check
@@ -150,35 +152,35 @@ func LoadConfig(cfg_file string) (*Config, error) {
 	}
 
 	for name, check := range new_cfg.Checks {
-		if err :=initialize_check(name, check, new_cfg); err != nil {
-			log.Error("Invalid check config for %s: %s (skipping)", name, err.Error())
+		if err := initialize_check(name, check, new_cfg); err != nil {
+			log.Errorf("Invalid check config for %s: %s (skipping)", name, err.Error())
 			delete(new_cfg.Checks, name)
 			continue
 		}
 
-		if (cfg != nil) {
+		if cfg != nil {
 			if val, ok := cfg.Checks[check.Name]; ok {
 				merge_checks(check, val)
 			}
 		}
-		log.Debug("Check %s defined as %#v", check.Name, check)
+		log.Debugf("Check %s defined as %#v", check.Name, check)
 	}
 
 	cfg = new_cfg
 	log.SetupLogging(cfg.Log)
-	log.Debug("Config successfully loaded as: %#v", cfg)
+	log.Debugf("Config successfully loaded as: %#v", cfg)
 	return cfg, nil
 }
 
 // Function-variable to perform initial scheduling of a check, upon config generation.
-var first_run = func (interval int64) (time.Time) {
+var first_run = func(interval int64) time.Time {
 	return time.Now().Add(time.Duration(rand.Int63n(interval * int64(time.Second))))
 }
 
 // Takes a new check, and initializes it based on global config defaults, and
 // hard-coded safeguards, to ensure checks don't run *too* frequently, or get
 // configured in a messed up way (like setting Timeout above Every, or to 0)
-func initialize_check(name string, check *Check, defaults *Config) (error) {
+func initialize_check(name string, check *Check, defaults *Config) error {
 	if check.Name == "" {
 		check.Name = name
 	}
@@ -191,7 +193,7 @@ func initialize_check(name string, check *Check, defaults *Config) (error) {
 		var err error
 		check.cmd_args, err = shellwords.Parse(check.Command)
 		if err != nil {
-		return errors.New(fmt.Sprintf("Unable to parse command `%s`: %s",
+			return errors.New(fmt.Sprintf("Unable to parse command `%s`: %s",
 				check.Command, err.Error()))
 		}
 	}

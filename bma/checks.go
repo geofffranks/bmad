@@ -1,6 +1,6 @@
 package bma
 
-import "github.com/geofffranks/bmad/log"
+import "github.com/starkandwayne/goutils/log"
 import "bytes"
 import "errors"
 import "fmt"
@@ -26,76 +26,77 @@ import "time"
 // metric, or state up to bolo, and thus state meta-checks are
 // disallowed.
 type Check struct {
-	Command      string               // Command to execute for this Check
-	Every        int64                // Specific interval at which to run this Check (in seconds)
-	Retries      int                  // Number of times to retry this Check after failure
-	Retry_every  int64                // Retry interval at which to retry after Check failure (in secons)
-	Timeout      int64                // Maximum execution time for the Check (in seconds)
-	Env          map[string]string    // Map of environment variables to set during Check execution
-	Run_as       string               // User name to run this Check as
-	Bulk         string               // Is this check a bulk-mode check
-	Report       string               // Should this check report its exit code as a STATE event? (bulk-mode only)
-	Name         string               // Name of the Check
+	Command     string            // Command to execute for this Check
+	Every       int64             // Specific interval at which to run this Check (in seconds)
+	Retries     int               // Number of times to retry this Check after failure
+	Retry_every int64             // Retry interval at which to retry after Check failure (in secons)
+	Timeout     int64             // Maximum execution time for the Check (in seconds)
+	Env         map[string]string // Map of environment variables to set during Check execution
+	Run_as      string            // User name to run this Check as
+	Bulk        string            // Is this check a bulk-mode check
+	Report      string            // Should this check report its exit code as a STATE event? (bulk-mode only)
+	Name        string            // Name of the Check
 
-	cmd_args     []string
-	process     *exec.Cmd
-	rc           int
-	attempts     int
-	stdout      *bytes.Buffer
-	stderr      *bytes.Buffer
-	output       string
-	err_msg      string
+	cmd_args []string
+	process  *exec.Cmd
+	rc       int
+	attempts int
+	stdout   *bytes.Buffer
+	stderr   *bytes.Buffer
+	output   string
+	err_msg  string
 
-	started_at   time.Time
-	ended_at     time.Time
-	next_run     time.Time
-	latency      time.Duration
-	duration     time.Duration
-	running      bool
+	started_at time.Time
+	ended_at   time.Time
+	next_run   time.Time
+	latency    time.Duration
+	duration   time.Duration
+	running    bool
 
-	sig_term     bool
-	sig_kill     bool
+	sig_term bool
+	sig_kill bool
 }
 
-const OK       int = 0
-const WARNING  int = 1
+const OK int = 0
+const WARNING int = 1
 const CRITICAL int = 2
-const UNKNOWN  int = 3
+const UNKNOWN int = 3
 
 // Converts the Check's environment variable map
 // into an array of bash-compatibally formated environment
 // variables.
-func (self *Check) environment() ([]string) {
+func (self *Check) environment() []string {
 	var env []string
-	for k, v := range(self.Env) {
+	for k, v := range self.Env {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 	return env
 }
+
 // Merges relavent data from an old check into the new check
 // so that upon config reload, we can retain state properly
 func merge_checks(check *Check, old *Check) {
-	check.next_run   = old.next_run
+	check.next_run = old.next_run
 	check.started_at = old.started_at
-	check.ended_at   = old.ended_at
-	check.duration   = old.duration
-	check.attempts   = old.attempts
-	check.rc         = old.rc
-	check.latency    = old.latency
-	check.stdout     = old.stdout
-	check.stderr     = old.stderr
-	check.output     = old.output
-	check.err_msg    = old.err_msg
-	check.sig_term   = old.sig_term
-	check.sig_kill   = old.sig_kill
-	check.process    = old.process
-	check.running    = old.running
+	check.ended_at = old.ended_at
+	check.duration = old.duration
+	check.attempts = old.attempts
+	check.rc = old.rc
+	check.latency = old.latency
+	check.stdout = old.stdout
+	check.stderr = old.stderr
+	check.output = old.output
+	check.err_msg = old.err_msg
+	check.sig_term = old.sig_term
+	check.sig_kill = old.sig_kill
+	check.process = old.process
+	check.running = old.running
 }
 
 // Schedules the next run of the Check. If interval is
 // not provided, defaults to the Every value of the Check.
-func (self *Check) schedule(last_started time.Time, interval int64) () {
-	if (interval <= 0) {
+func (self *Check) schedule(last_started time.Time, interval int64) {
+	if interval <= 0 {
 		interval = self.Every
 	}
 	self.next_run = last_started.Add(time.Duration(interval) * time.Second)
@@ -105,7 +106,7 @@ func (self *Check) schedule(last_started time.Time, interval int64) () {
 // environment variables, pwd, effective user/group, hook
 // up buffers for grabbing check output, run the process,
 // and fill out accounting data for the check.
-func (self *Check) Spawn() (error) {
+func (self *Check) Spawn() error {
 	if self.running {
 		return errors.New(fmt.Sprintf("check %s[%d] is already running", self.Name, self.process.Process.Pid))
 	}
@@ -117,14 +118,14 @@ func (self *Check) Spawn() (error) {
 	var e bytes.Buffer
 	process.Stdout = &o
 	process.Stderr = &e
-	self.output  = ""
+	self.output = ""
 	self.err_msg = ""
 
 	// Reset started_at as soon as possible after determining there isn't
 	// a check already running. This way, if there are errors we can
 	// back-off rescheduling, rather than try every tick, for relatively
 	// long-term fixes (user creation, file creation/renames/permissions)
-	self.started_at  = time.Now()
+	self.started_at = time.Now()
 
 	if self.Run_as != "" {
 		u, err := user.Lookup(self.Run_as)
@@ -139,7 +140,7 @@ func (self *Check) Spawn() (error) {
 		if err != nil {
 			return err
 		}
-		log.Debug("Running check %s as %q", self.Name, self.Run_as)
+		log.Debugf("Running check %s as %q", self.Name, self.Run_as)
 		process.SysProcAttr = &syscall.SysProcAttr{
 			Credential: &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)},
 		}
@@ -148,16 +149,16 @@ func (self *Check) Spawn() (error) {
 	if err := process.Start(); err != nil {
 		return err
 	}
-	log.Debug("Spawned check %s[%d]", self.Name, process.Process.Pid)
+	log.Debugf("Spawned check %s[%d]", self.Name, process.Process.Pid)
 
-	self.running     = true
-	self.process     = process
-	self.stdout      = &o
-	self.stderr      = &e
-	self.sig_term    = false
-	self.sig_kill    = false
-	self.ended_at    = time.Time{}
-	self.duration    = 0
+	self.running = true
+	self.process = process
+	self.stdout = &o
+	self.stderr = &e
+	self.sig_term = false
+	self.sig_kill = false
+	self.ended_at = time.Time{}
+	self.duration = 0
 
 	return nil
 }
@@ -178,29 +179,29 @@ func (self *Check) Spawn() (error) {
 //
 // Once complete, some additional meta-stats for the check execution
 // are appended to the check output, to be submit up to bolo
-func (self *Check) Reap() (bool) {
+func (self *Check) Reap() bool {
 	pid := self.process.Process.Pid
 
 	var ws syscall.WaitStatus
-	status, err := syscall.Wait4(pid, &ws, syscall.WNOHANG, nil);
+	status, err := syscall.Wait4(pid, &ws, syscall.WNOHANG, nil)
 	if err != nil {
-		log.Error("Error waiting on check %s[%d]: %s", self.Name, pid, err.Error())
+		log.Errorf("Error waiting on check %s[%d]: %s", self.Name, pid, err.Error())
 		return false
 	}
 	if status == 0 {
 		// self to see if we need to sigkill due to failed sigterm
-		if time.Now().After(self.started_at.Add(time.Duration(self.Timeout + 2) * time.Second)) {
-			log.Warn("Check %s[%d] has been running too long, sending SIGKILL", self.Name, pid)
+		if time.Now().After(self.started_at.Add(time.Duration(self.Timeout+2) * time.Second)) {
+			log.Warnf("Check %s[%d] has been running too long, sending SIGKILL", self.Name, pid)
 			if err := syscall.Kill(pid, syscall.SIGKILL); err != nil {
-				log.Error("Error sending SIGKILL to check %s[%d]: %s", self.Name, pid, err.Error())
+				log.Errorf("Error sending SIGKILL to check %s[%d]: %s", self.Name, pid, err.Error())
 			}
 			self.sig_kill = true
 		}
 		// self to see if we need to sigterm due to self timeout expiry
-		if ! self.sig_kill && time.Now().After(self.started_at.Add(time.Duration(self.Timeout) * time.Second)) {
-			log.Warn("Check %s[%d] has been running too long, sending SIGTERM", self.Name, pid)
+		if !self.sig_kill && time.Now().After(self.started_at.Add(time.Duration(self.Timeout)*time.Second)) {
+			log.Warnf("Check %s[%d] has been running too long, sending SIGTERM", self.Name, pid)
 			if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
-				log.Error("Error sending SIGTERM to check %s[%d]: %s", self.Name, pid, err.Error())
+				log.Errorf("Error sending SIGTERM to check %s[%d]: %s", self.Name, pid, err.Error())
 			}
 			self.sig_term = true
 		}
@@ -208,20 +209,20 @@ func (self *Check) Reap() (bool) {
 	}
 
 	self.ended_at = time.Now()
-	self.running  = false
+	self.running = false
 	self.duration = time.Since(self.started_at)
-	self.latency  = self.started_at.Sub(self.next_run)
-	self.output   = string(self.stdout.Bytes())
-	self.err_msg  = string(self.stderr.Bytes())
+	self.latency = self.started_at.Sub(self.next_run)
+	self.output = string(self.stdout.Bytes())
+	self.err_msg = string(self.stderr.Bytes())
 
-	if (ws.Exited()) {
+	if ws.Exited() {
 		self.rc = ws.ExitStatus()
 	} else {
-		log.Debug("Check %s[%d] exited abnormally (signaled/stopped). Setting rc to UNKNOWN", self.Name, pid)
+		log.Debugf("Check %s[%d] exited abnormally (signaled/stopped). Setting rc to UNKNOWN", self.Name, pid)
 		self.rc = UNKNOWN
 	}
 	if self.rc > UNKNOWN {
-		log.Debug("Check %s[%d] returned with an invalid exit code. Setting rc to UNKOWN", self.Name, pid)
+		log.Debugf("Check %s[%d] returned with an invalid exit code. Setting rc to UNKOWN", self.Name, pid)
 		self.rc = UNKNOWN
 	}
 
@@ -232,7 +233,7 @@ func (self *Check) Reap() (bool) {
 		if self.sig_term || self.sig_kill {
 			timeout_triggered = "reached"
 		}
-		log.Warn("Check %s[%d] took %0.3f seconds to run, at interval %d (timeout of %d was %s)",
+		log.Warnf("Check %s[%d] took %0.3f seconds to run, at interval %d (timeout of %d was %s)",
 			self.Name, pid, self.duration.Seconds(), self.Every, self.Timeout, timeout_triggered)
 	}
 	return true
@@ -248,11 +249,11 @@ func (self *Check) Reap() (bool) {
 // If full_stats is set to false, the latency, and count of checks run
 // will *NOT* be reported. This is primarily used internally
 // for reporting stats differently for run-once mode vs daemonized.
-func (self *Check) Submit(full_stats bool) (error) {
+func (self *Check) Submit(full_stats bool) error {
 	// Add meta-stats for bmad
 	var meta string
 	var msg string
-	if (self.Bulk == "true" && self.Report == "true") {
+	if self.Bulk == "true" && self.Report == "true" {
 		// check-specific state (for bulk data-submitter checks)
 		if self.rc == OK {
 			msg = self.Name + " completed successfully!"
@@ -279,12 +280,12 @@ func (self *Check) Submit(full_stats bool) (error) {
 	}
 
 	meta = meta + "\n"
-	log.Debug("%s output: %s", self.Name, self.output)
+	log.Debugf("%s output: %s", self.Name, self.output)
 	var err error
 	if self.Bulk == "true" || self.attempts >= self.Retries {
 		err = SendToBolo(fmt.Sprintf("%s\n%s", self.output, meta))
 	} else {
-		log.Debug("%s not yet at max attempts, suppressing output submission", self.Name)
+		log.Debugf("%s not yet at max attempts, suppressing output submission", self.Name)
 		err = SendToBolo(meta)
 	}
 	if err != nil {
@@ -293,15 +294,15 @@ func (self *Check) Submit(full_stats bool) (error) {
 	return nil
 }
 
-func (self *Check) Fail(failure error) (error) {
-	log.Error("Error running check \"%s\": %s", self.Name, failure.Error())
+func (self *Check) Fail(failure error) error {
+	log.Errorf("Error running check \"%s\": %s", self.Name, failure.Error())
 	var err error
 	self.rc = 3
 	self.reschedule()
-	if (self.Report == "true") {
-		if (self.Bulk == "true" || self.attempts >= self.Retries) {
+	if self.Report == "true" {
+		if self.Bulk == "true" || self.attempts >= self.Retries {
 			msg := fmt.Sprintf("STATE %d %s:bmad:%s %d %s",
-				time.Now().Unix(), cfg.Host, self.Name, self.rc, "failed to exec: " + failure.Error())
+				time.Now().Unix(), cfg.Host, self.Name, self.rc, "failed to exec: "+failure.Error())
 			err = SendToBolo(msg)
 		}
 	}
@@ -309,12 +310,12 @@ func (self *Check) Fail(failure error) (error) {
 }
 
 // Determines whether or not a Check should be run
-func (self *Check) ShouldRun() (bool) {
-	return ! self.running && time.Now().After(self.next_run)
+func (self *Check) ShouldRun() bool {
+	return !self.running && time.Now().After(self.next_run)
 }
 
 // Returns the last output of a check
-func (self *Check) Output() (string) {
+func (self *Check) Output() string {
 	return self.output
 }
 
