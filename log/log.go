@@ -75,65 +75,65 @@ func write (msg string, args ...interface{}) {
 	}
 }
 
-// Logs a Debug message.
+// Logs a formatted Debug message.
 // Supports fmt.Sprintf style arguments.
-func Debug (msg string, args ...interface{}) {
+func Debugf (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_DEBUG {
 		write("DEBUG: " + msg, args...)
 	}
 }
 
-// Logs an Info message.
+// Logs a formatted Info message.
 // Supports fmt.Sprintf style arguments.
-func Info (msg string, args ...interface{}) {
+func Infof (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_INFO {
 		write("INFO: " + msg, args...)
 	}
 }
 
-// Logs a Notice message.
+// Logs a formatted Notice message.
 // Supports fmt.Sprintf style arguments.
-func Notice (msg string, args ...interface{}) {
+func Noticef (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_NOTICE {
 		write("NOTICE: " + msg, args...)
 	}
 }
 
-// Logs a Warning message.
+// Logs a formatted Warning message.
 // Supports fmt.Sprintf style arguments.
-func Warn (msg string, args ...interface{}) {
+func Warnf (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_WARNING {
 		write("WARNING: " + msg, args...)
 	}
 }
 
-// Logs an Error message.
+// Logs a formatted Error message.
 // Supports fmt.Sprintf style arguments.
-func Error (msg string, args ...interface{}) {
+func Errorf (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_ERR {
 		write("ERROR: " + msg, args...)
 	}
 }
 
-// Logs a Crit message.
+// Logs a formatted Crit message.
 // Supports fmt.Sprintf style arguments.
-func Crit (msg string, args ...interface{}) {
+func Critf (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_CRIT {
 		write("CRITICAL: " + msg, args...)
 	}
 }
 
-// Logs an Alert message.
+// Logs a formatted Alert message.
 // Supports fmt.Sprintf style arguments.
-func Alert (msg string, args ...interface{}) {
+func Alertf (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_ALERT {
 		write("ALERT: " + msg, args...)
 	}
 }
 
-// Logs an Emerg message.
+// Logs a formatted Emerg message.
 // Supports fmt.Sprintf style arguments.
-func Emerg (msg string, args ...interface{}) {
+func Emergf (msg string, args ...interface{}) {
 	if log.level >= syslog.LOG_EMERG {
 		write("EMERGENCY: " + msg, args...)
 	}
